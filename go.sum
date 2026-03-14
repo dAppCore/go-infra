@@ -1,7 +1,7 @@
-forge.lthn.ai/core/cli v0.1.0 h1:2XRiEMVzUElnQlZnHYDyfKIKQVPcCzGuYHlnz55GjsM=
-forge.lthn.ai/core/cli v0.1.0/go.mod h1:mZ7dzccfzo0BP2dE7Mwuw9dXuIowiEd1G5ZGMoLuxVc=
-forge.lthn.ai/core/go v0.1.0 h1:Ow/1NTajrrNPO0zgkskEyEGdx4SKpiNqTaqM0txNOYI=
-forge.lthn.ai/core/go v0.1.0/go.mod h1:lwi0tccAlg5j3k6CfoNJEueBc5l9mUeSBX/x6uY8ZbQ=
+forge.lthn.ai/core/cli v0.3.0 h1:FpP1Wp4GwhOd+ZHWrjKZUCEnGyWoXOVDTwhytFb6hrA=
+forge.lthn.ai/core/cli v0.3.0/go.mod h1:pocya1fKLbIKnNJ9rmfUDqBsH5bg02P426JvDBomcJo=
+forge.lthn.ai/core/go v0.3.0 h1:mOG97ApMprwx9Ked62FdWVwXTGSF6JO6m0DrVpoH2Q4=
+forge.lthn.ai/core/go v0.3.0/go.mod h1:gE6c8h+PJ2287qNhVUJ5SOe1kopEwHEquvinstpuyJc=
 forge.lthn.ai/core/go-ansible v0.1.0 h1:yl3FaUpN/U2Iap0nuTNIHd2k1nsSb0OatwxMdnNyKD8=
 forge.lthn.ai/core/go-ansible v0.1.0/go.mod h1:mJ9DOf0RwtBm6nY8p3dW6q4dR7Obh3lRLI4LMDSDpMc=
 forge.lthn.ai/core/go-crypt v0.1.0 h1:92gwdQi7iAwktpvZhL/8Cu+QS6xKCtGP4FJfyInPGnw=
@@ -10,10 +10,12 @@ forge.lthn.ai/core/go-i18n v0.1.0 h1:F7JVSoVkZtzx9JfhpntM9z3iQm1vnuMUi/Zklhz8PCI
 forge.lthn.ai/core/go-i18n v0.1.0/go.mod h1:Q4xsrxuNCl/6NfMv1daria7t1RSiyy8ml+6jiPtUcBs=
 forge.lthn.ai/core/go-inference v0.0.2 h1:aHjBkYyLKxLr9tbO4AvzzV/lsZueGq/jeo33SLh113k=
 forge.lthn.ai/core/go-inference v0.0.2/go.mod h1:jfWz+IJX55wAH98+ic6FEqqGB6/P31CHlg7VY7pxREw=
-forge.lthn.ai/core/go-io v0.0.3 h1:TlhYpGTyjPgAlbEHyYrVSeUChZPhJXcLZ7D/8IbFqfI=
-forge.lthn.ai/core/go-io v0.0.3/go.mod h1:ZlU9OQpsvNFNmTJoaHbFIkisZyc0eCq0p8znVWQLRf0=
+forge.lthn.ai/core/go-io v0.1.0 h1:aYNvmbU2VVsjXnut0WQ4DfVxcFdheziahJB32mfeJ7g=
+forge.lthn.ai/core/go-io v0.1.0/go.mod h1:ZlU9OQpsvNFNmTJoaHbFIkisZyc0eCq0p8znVWQLRf0=
 forge.lthn.ai/core/go-log v0.0.1 h1:x/E6EfF9vixzqiLHQOl2KT25HyBcMc9qiBkomqVlpPg=
 forge.lthn.ai/core/go-log v0.0.1/go.mod h1:r14MXKOD3LF/sI8XUJQhRk/SZHBE7jAFVuCfgkXoZPw=
+forge.lthn.ai/core/go-process v0.1.2 h1:0fdLJq/DPssilN9E5yude/xHNfZRKHghIjo++b5aXgc=
+forge.lthn.ai/core/go-process v0.1.2/go.mod h1:9oxVALrZaZCqFe8YDdheIS5bRUV1SBz4tVW/MflAtxM=
 forge.lthn.ai/core/go-scm v0.1.7 h1:UuIqOLal4MUNS4UoWlBBOz1b/13QlcxnMnx9e5fIHWM=
 forge.lthn.ai/core/go-scm v0.1.7/go.mod h1:3GSEnNWyak3ETGehOW2DEcjWscBlNF5JHu31z2hHTVM=
 github.com/ProtonMail/go-crypto v1.3.0 h1:ILq8+Sf5If5DCpHQp4PbZdS1J7HDFRXz/+xKBiRGFrw=
