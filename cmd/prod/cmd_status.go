@@ -10,6 +10,7 @@ import (
 
 	"forge.lthn.ai/core/go-ansible"
 	"forge.lthn.ai/core/cli/pkg/cli"
+	coreerr "forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -114,14 +115,14 @@ func checkHost(ctx context.Context, name string, host *infra.Host) hostStatus {
 
 	client, err := ansible.NewSSHClient(sshCfg)
 	if err != nil {
-		s.Error = fmt.Errorf("create SSH client: %w", err)
+		s.Error = coreerr.E("prod.checkHost", "create SSH client", err)
 		return s
 	}
 	defer func() { _ = client.Close() }()
 
 	start := time.Now()
 	if err := client.Connect(ctx); err != nil {
-		s.Error = fmt.Errorf("SSH connect: %w", err)
+		s.Error = coreerr.E("prod.checkHost", "SSH connect", err)
 		return s
 	}
 	s.Connected = true

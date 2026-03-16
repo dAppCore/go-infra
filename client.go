@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	coreerr "forge.lthn.ai/core/go-log"
 )
 
 // RetryConfig controls exponential backoff retry behaviour.
@@ -105,7 +107,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		resp, err := a.client.Do(req)
 		if err != nil {
-			lastErr = fmt.Errorf("%s: %w", a.prefix, err)
+			lastErr = coreerr.E(a.prefix, "request failed", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -115,7 +117,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 		data, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			lastErr = fmt.Errorf("read response: %w", err)
+			lastErr = coreerr.E("client.Do", "read response", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -129,7 +131,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 			a.blockedUntil = time.Now().Add(retryAfter)
 			a.mu.Unlock()
 
-			lastErr = fmt.Errorf("%s %d: rate limited", a.prefix, resp.StatusCode)
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
 			if attempt < attempts-1 {
 				select {
 				case <-req.Context().Done():
@@ -142,7 +144,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Server errors are retryable.
 		if resp.StatusCode >= 500 {
-			lastErr = fmt.Errorf("%s %d: %s", a.prefix, resp.StatusCode, string(data))
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -151,13 +153,13 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Client errors (4xx, except 429 handled above) are not retried.
 		if resp.StatusCode >= 400 {
-			return fmt.Errorf("%s %d: %s", a.prefix, resp.StatusCode, string(data))
+			return coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
 		}
 
 		// Success — decode if requested.
 		if result != nil {
 			if err := json.Unmarshal(data, result); err != nil {
-				return fmt.Errorf("decode response: %w", err)
+				return coreerr.E("client.Do", "decode response", err)
 			}
 		}
 		return nil
@@ -191,7 +193,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 
 		resp, err := a.client.Do(req)
 		if err != nil {
-			lastErr = fmt.Errorf("%s: %w", a.prefix, err)
+			lastErr = coreerr.E(a.prefix, "request failed", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -201,7 +203,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		data, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			lastErr = fmt.Errorf("read response: %w", err)
+			lastErr = coreerr.E("client.DoRaw", "read response", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -214,7 +216,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 			a.blockedUntil = time.Now().Add(retryAfter)
 			a.mu.Unlock()
 
-			lastErr = fmt.Errorf("%s %d: rate limited", a.prefix, resp.StatusCode)
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
 			if attempt < attempts-1 {
 				select {
 				case <-req.Context().Done():
@@ -226,7 +228,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 500 {
-			lastErr = fmt.Errorf("%s %d: %s", a.prefix, resp.StatusCode, string(data))
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -234,7 +236,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 400 {
-			return nil, fmt.Errorf("%s %d: %s", a.prefix, resp.StatusCode, string(data))
+			return nil, coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
 		}
 
 		return data, nil

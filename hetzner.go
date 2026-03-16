@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	coreerr "forge.lthn.ai/core/go-log"
 )
 
 const (
@@ -210,7 +212,7 @@ func (c *HCloudClient) GetLoadBalancer(ctx context.Context, id int) (*HCloudLoad
 func (c *HCloudClient) CreateLoadBalancer(ctx context.Context, req HCloudLBCreateRequest) (*HCloudLoadBalancer, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, coreerr.E("HCloudClient.CreateLoadBalancer", "marshal request", err)
 	}
 
 	var result struct {

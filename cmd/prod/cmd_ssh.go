@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"forge.lthn.ai/core/cli/pkg/cli"
+	coreerr "forge.lthn.ai/core/go-log"
 )
 
 var sshCmd = &cli.Command{
@@ -37,7 +38,7 @@ func runSSH(cmd *cli.Command, args []string) error {
 		for n, h := range cfg.Hosts {
 			cli.Print("  %s  %s  (%s)\n", cli.BoldStyle.Render(n), h.IP, h.Role)
 		}
-		return fmt.Errorf("host '%s' not found in infra.yaml", name)
+		return coreerr.E("prod.ssh", "host '"+name+"' not found in infra.yaml", nil)
 	}
 
 	sshArgs := []string{
@@ -55,7 +56,7 @@ func runSSH(cmd *cli.Command, args []string) error {
 
 	sshPath, err := exec.LookPath("ssh")
 	if err != nil {
-		return fmt.Errorf("ssh not found: %w", err)
+		return coreerr.E("prod.ssh", "ssh not found", err)
 	}
 
 	// Replace current process with SSH

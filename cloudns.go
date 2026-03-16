@@ -3,10 +3,11 @@ package infra
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	coreerr "forge.lthn.ai/core/go-log"
 )
 
 const cloudnsBaseURL = "https://api.cloudns.net"
@@ -81,7 +82,7 @@ func (c *CloudNSClient) ListRecords(ctx context.Context, domain string) (map[str
 
 	var records map[string]CloudNSRecord
 	if err := json.Unmarshal(data, &records); err != nil {
-		return nil, fmt.Errorf("parse records: %w", err)
+		return nil, coreerr.E("CloudNSClient.ListRecords", "parse records", err)
 	}
 	return records, nil
 }
@@ -108,11 +109,11 @@ func (c *CloudNSClient) CreateRecord(ctx context.Context, domain, host, recordTy
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
+		return "", coreerr.E("CloudNSClient.CreateRecord", "parse response", err)
 	}
 
 	if result.Status != "Success" {
-		return "", fmt.Errorf("cloudns: %s", result.StatusDescription)
+		return "", coreerr.E("CloudNSClient.CreateRecord", result.StatusDescription, nil)
 	}
 
 	return strconv.Itoa(result.Data.ID), nil
@@ -138,11 +139,11 @@ func (c *CloudNSClient) UpdateRecord(ctx context.Context, domain, recordID, host
 		StatusDescription string `json:"statusDescription"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return fmt.Errorf("parse response: %w", err)
+		return coreerr.E("CloudNSClient.UpdateRecord", "parse response", err)
 	}
 
 	if result.Status != "Success" {
-		return fmt.Errorf("cloudns: %s", result.StatusDescription)
+		return coreerr.E("CloudNSClient.UpdateRecord", result.StatusDescription, nil)
 	}
 
 	return nil
@@ -164,11 +165,11 @@ func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID strin
 		StatusDescription string `json:"statusDescription"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return fmt.Errorf("parse response: %w", err)
+		return coreerr.E("CloudNSClient.DeleteRecord", "parse response", err)
 	}
 
 	if result.Status != "Success" {
-		return fmt.Errorf("cloudns: %s", result.StatusDescription)
+		return coreerr.E("CloudNSClient.DeleteRecord", result.StatusDescription, nil)
 	}
 
 	return nil
@@ -179,7 +180,7 @@ func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID strin
 func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordType, value string, ttl int) (bool, error) {
 	records, err := c.ListRecords(ctx, domain)
 	if err != nil {
-		return false, fmt.Errorf("list records: %w", err)
+		return false, coreerr.E("CloudNSClient.EnsureRecord", "list records", err)
 	}
 
 	// Check if record already exists
@@ -190,7 +191,7 @@ func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordTy
 			}
 			// Update existing record
 			if err := c.UpdateRecord(ctx, domain, id, host, recordType, value, ttl); err != nil {
-				return false, fmt.Errorf("update record: %w", err)
+				return false, coreerr.E("CloudNSClient.EnsureRecord", "update record", err)
 			}
 			return true, nil
 		}
@@ -198,7 +199,7 @@ func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordTy
 
 	// Create new record
 	if _, err := c.CreateRecord(ctx, domain, host, recordType, value, ttl); err != nil {
-		return false, fmt.Errorf("create record: %w", err)
+		return false, coreerr.E("CloudNSClient.EnsureRecord", "create record", err)
 	}
 	return true, nil
 }

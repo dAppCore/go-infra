@@ -582,5 +582,5 @@ func parseGitHubRepo(url string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("could not parse GitHub repo from URL: %s", url)
+	return "", log.E("monitor.parseGitHubRepo", "could not parse GitHub repo from URL: "+url, nil)
 }

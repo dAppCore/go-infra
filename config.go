@@ -3,10 +3,10 @@
 package infra
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
+	coreerr "forge.lthn.ai/core/go-log"
 	coreio "forge.lthn.ai/core/go-io"
 	"gopkg.in/yaml.v3"
 )
@@ -232,12 +232,12 @@ type BackupJob struct {
 func Load(path string) (*Config, error) {
 	data, err := coreio.Local.Read(path)
 	if err != nil {
-		return nil, fmt.Errorf("read infra config: %w", err)
+		return nil, coreerr.E("infra.Load", "read infra config", err)
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return nil, fmt.Errorf("parse infra config: %w", err)
+		return nil, coreerr.E("infra.Load", "parse infra config", err)
 	}
 
 	// Expand SSH key paths
@@ -269,7 +269,7 @@ func Discover(startDir string) (*Config, string, error) {
 		}
 		dir = parent
 	}
-	return nil, "", fmt.Errorf("infra.yaml not found (searched from %s)", startDir)
+	return nil, "", coreerr.E("infra.Discover", "infra.yaml not found (searched from "+startDir+")", nil)
 }
 
 // HostsByRole returns all hosts matching the given role.

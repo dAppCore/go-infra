@@ -2,12 +2,11 @@ package prod
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"time"
 
 	"forge.lthn.ai/core/cli/pkg/cli"
+	coreerr "forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -71,7 +70,7 @@ func runSetup(cmd *cli.Command, args []string) error {
 
 		if err := step.fn(ctx, cfg); err != nil {
 			cli.Print("  %s %s: %s\n", cli.ErrorStyle.Render("✗"), step.name, err)
-			return fmt.Errorf("step %s failed: %w", step.name, err)
+			return coreerr.E("prod.setup", "step "+step.name+" failed", err)
 		}
 
 		cli.Print("  %s %s complete\n", cli.SuccessStyle.Render("✓"), step.name)
@@ -90,7 +89,7 @@ func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 		hc := infra.NewHCloudClient(hcloudToken)
 		servers, err := hc.ListServers(ctx)
 		if err != nil {
-			return fmt.Errorf("list HCloud servers: %w", err)
+			return coreerr.E("prod.stepDiscover", "list HCloud servers", err)
 		}
 
 		for _, s := range servers {
@@ -115,7 +114,7 @@ func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 		hr := infra.NewHRobotClient(robotUser, robotPass)
 		servers, err := hr.ListServers(ctx)
 		if err != nil {
-			return fmt.Errorf("list Robot servers: %w", err)
+			return coreerr.E("prod.stepDiscover", "list Robot servers", err)
 		}
 
 		for _, s := range servers {
@@ -141,7 +140,7 @@ func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 	hcloudToken := os.Getenv("HCLOUD_TOKEN")
 	if hcloudToken == "" {
-		return errors.New("HCLOUD_TOKEN required for load balancer management")
+		return coreerr.E("prod.stepLoadBalancer", "HCLOUD_TOKEN required for load balancer management", nil)
 	}
 
 	hc := infra.NewHCloudClient(hcloudToken)
@@ -149,7 +148,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 	// Check if LB already exists
 	lbs, err := hc.ListLoadBalancers(ctx)
 	if err != nil {
-		return fmt.Errorf("list load balancers: %w", err)
+		return coreerr.E("prod.stepLoadBalancer", "list load balancers", err)
 	}
 
 	for _, lb := range lbs {
@@ -176,7 +175,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 	for _, b := range cfg.LoadBalancer.Backends {
 		host, ok := cfg.Hosts[b.Host]
 		if !ok {
-			return fmt.Errorf("backend host '%s' not found in config", b.Host)
+			return coreerr.E("prod.stepLoadBalancer", "backend host '"+b.Host+"' not found in config", nil)
 		}
 		targets = append(targets, infra.HCloudLBCreateTarget{
 			Type: "ip",
@@ -224,7 +223,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 
 	lb, err := hc.CreateLoadBalancer(ctx, req)
 	if err != nil {
-		return fmt.Errorf("create load balancer: %w", err)
+		return coreerr.E("prod.stepLoadBalancer", "create load balancer", err)
 	}
 
 	cli.Print("  Created: %s (ID: %d, IP: %s)\n",
@@ -237,7 +236,7 @@ func stepDNS(ctx context.Context, cfg *infra.Config) error {
 	authID := os.Getenv("CLOUDNS_AUTH_ID")
 	authPass := os.Getenv("CLOUDNS_AUTH_PASSWORD")
 	if authID == "" || authPass == "" {
-		return errors.New("CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required")
+		return coreerr.E("prod.stepDNS", "CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required", nil)
 	}
 
 	dns := infra.NewCloudNSClient(authID, authPass)
