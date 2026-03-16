@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	coreio "forge.lthn.ai/core/go-io"
 	"gopkg.in/yaml.v3"
 )
 
@@ -229,13 +230,13 @@ type BackupJob struct {
 
 // Load reads and parses an infra.yaml file.
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	data, err := coreio.Local.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("read infra config: %w", err)
 	}
 
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
 		return nil, fmt.Errorf("parse infra config: %w", err)
 	}
 
