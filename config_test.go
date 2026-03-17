@@ -79,6 +79,55 @@ func TestLoad_Ugly(t *testing.T) {
 	}
 }
 
+func TestConfig_HostsByRole_Good(t *testing.T) {
+	cfg := &Config{
+		Hosts: map[string]*Host{
+			"de":    {FQDN: "de.example.com", Role: "app"},
+			"de2":   {FQDN: "de2.example.com", Role: "app"},
+			"noc":   {FQDN: "noc.example.com", Role: "bastion"},
+			"build": {FQDN: "build.example.com", Role: "builder"},
+		},
+	}
+
+	apps := cfg.HostsByRole("app")
+	if len(apps) != 2 {
+		t.Errorf("HostsByRole(app) = %d, want 2", len(apps))
+	}
+	if _, ok := apps["de"]; !ok {
+		t.Error("expected de in app hosts")
+	}
+	if _, ok := apps["de2"]; !ok {
+		t.Error("expected de2 in app hosts")
+	}
+
+	bastions := cfg.HostsByRole("bastion")
+	if len(bastions) != 1 {
+		t.Errorf("HostsByRole(bastion) = %d, want 1", len(bastions))
+	}
+
+	empty := cfg.HostsByRole("nonexistent")
+	if len(empty) != 0 {
+		t.Errorf("HostsByRole(nonexistent) = %d, want 0", len(empty))
+	}
+}
+
+func TestConfig_AppServers_Good(t *testing.T) {
+	cfg := &Config{
+		Hosts: map[string]*Host{
+			"de":  {FQDN: "de.example.com", Role: "app"},
+			"noc": {FQDN: "noc.example.com", Role: "bastion"},
+		},
+	}
+
+	apps := cfg.AppServers()
+	if len(apps) != 1 {
+		t.Errorf("AppServers() = %d, want 1", len(apps))
+	}
+	if _, ok := apps["de"]; !ok {
+		t.Error("expected de in AppServers()")
+	}
+}
+
 func TestExpandPath(t *testing.T) {
 	home, _ := os.UserHomeDir()
 

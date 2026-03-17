@@ -116,7 +116,7 @@ func TestHCloudClient_Do_Bad_APIError(t *testing.T) {
 	var result struct{}
 	err := client.get(context.Background(), "/servers", &result)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hcloud API 403")
+	assert.Contains(t, err.Error(), "hcloud API: HTTP 403")
 }
 
 func TestHCloudClient_Do_Bad_APIErrorNoJSON(t *testing.T) {
@@ -136,7 +136,7 @@ func TestHCloudClient_Do_Bad_APIErrorNoJSON(t *testing.T) {
 
 	err := client.get(context.Background(), "/servers", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hcloud API 500")
+	assert.Contains(t, err.Error(), "hcloud API: HTTP 500")
 }
 
 func TestHCloudClient_Do_Good_NilResult(t *testing.T) {
@@ -218,7 +218,170 @@ func TestHRobotClient_Get_Bad_HTTPError(t *testing.T) {
 
 	err := client.get(context.Background(), "/server", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hrobot API 401")
+	assert.Contains(t, err.Error(), "hrobot API: HTTP 401")
+}
+
+func TestHCloudClient_ListLoadBalancers_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/load_balancers", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"load_balancers":[{"id":789,"name":"hermes","public_net":{"enabled":true,"ipv4":{"ip":"5.6.7.8"}}}]}`))
+	}))
+	defer ts.Close()
+
+	client := NewHCloudClient("test-token")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("hcloud API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	lbs, err := client.ListLoadBalancers(context.Background())
+	require.NoError(t, err)
+	require.Len(t, lbs, 1)
+	assert.Equal(t, "hermes", lbs[0].Name)
+	assert.Equal(t, 789, lbs[0].ID)
+}
+
+func TestHCloudClient_GetLoadBalancer_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/load_balancers/789", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"load_balancer":{"id":789,"name":"hermes","public_net":{"enabled":true,"ipv4":{"ip":"5.6.7.8"}}}}`))
+	}))
+	defer ts.Close()
+
+	client := NewHCloudClient("test-token")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("hcloud API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	lb, err := client.GetLoadBalancer(context.Background(), 789)
+	require.NoError(t, err)
+	assert.Equal(t, "hermes", lb.Name)
+}
+
+func TestHCloudClient_CreateLoadBalancer_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/load_balancers", r.URL.Path)
+
+		var body HCloudLBCreateRequest
+		err := json.NewDecoder(r.Body).Decode(&body)
+		require.NoError(t, err)
+		assert.Equal(t, "hermes", body.Name)
+		assert.Equal(t, "lb11", body.LoadBalancerType)
+		assert.Equal(t, "round_robin", body.Algorithm.Type)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"load_balancer":{"id":789,"name":"hermes","public_net":{"enabled":true,"ipv4":{"ip":"5.6.7.8"}}}}`))
+	}))
+	defer ts.Close()
+
+	client := NewHCloudClient("test-token")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithAuth(func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer test-token")
+		}),
+		WithPrefix("hcloud API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	lb, err := client.CreateLoadBalancer(context.Background(), HCloudLBCreateRequest{
+		Name:             "hermes",
+		LoadBalancerType: "lb11",
+		Location:         "fsn1",
+		Algorithm:        HCloudLBAlgorithm{Type: "round_robin"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "hermes", lb.Name)
+	assert.Equal(t, 789, lb.ID)
+}
+
+func TestHCloudClient_DeleteLoadBalancer_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/load_balancers/789", r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client := NewHCloudClient("test-token")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("hcloud API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	err := client.DeleteLoadBalancer(context.Background(), 789)
+	assert.NoError(t, err)
+}
+
+func TestHCloudClient_CreateSnapshot_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/servers/123/actions/create_image", r.URL.Path)
+
+		var body map[string]string
+		err := json.NewDecoder(r.Body).Decode(&body)
+		require.NoError(t, err)
+		assert.Equal(t, "daily backup", body["description"])
+		assert.Equal(t, "snapshot", body["type"])
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"image":{"id":456}}`))
+	}))
+	defer ts.Close()
+
+	client := NewHCloudClient("test-token")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithAuth(func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer test-token")
+		}),
+		WithPrefix("hcloud API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	err := client.CreateSnapshot(context.Background(), 123, "daily backup")
+	assert.NoError(t, err)
+}
+
+func TestHRobotClient_GetServer_Good(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/server/1.2.3.4", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"server":{"server_ip":"1.2.3.4","server_name":"noc","product":"EX44","dc":"FSN1","status":"ready","cancelled":false}}`))
+	}))
+	defer ts.Close()
+
+	client := NewHRobotClient("testuser", "testpass")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithAuth(func(req *http.Request) {
+			req.SetBasicAuth("testuser", "testpass")
+		}),
+		WithPrefix("hrobot API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	server, err := client.GetServer(context.Background(), "1.2.3.4")
+	require.NoError(t, err)
+	assert.Equal(t, "noc", server.ServerName)
+	assert.Equal(t, "EX44", server.Product)
 }
 
 // --- Type serialisation ---

@@ -137,7 +137,7 @@ func TestAPIClient_Do_Bad_ClientError(t *testing.T) {
 
 	err = c.Do(req, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "test-api 404")
+	assert.Contains(t, err.Error(), "test-api: HTTP 404")
 	assert.Contains(t, err.Error(), "not found")
 }
 
@@ -226,7 +226,7 @@ func TestAPIClient_Do_Bad_ExhaustsRetries(t *testing.T) {
 
 	err = c.Do(req, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "exhaust-test 500")
+	assert.Contains(t, err.Error(), "exhaust-test: HTTP 500")
 	// 1 initial + 2 retries = 3 attempts
 	assert.Equal(t, int32(3), attempts.Load())
 }
@@ -476,7 +476,7 @@ func TestAPIClient_DoRaw_Bad_ClientError(t *testing.T) {
 
 	_, err = c.DoRaw(req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "raw-test 403")
+	assert.Contains(t, err.Error(), "raw-test: HTTP 403")
 }
 
 func TestAPIClient_DoRaw_Good_RetriesServerError(t *testing.T) {

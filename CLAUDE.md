@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`core/go-infra` provides infrastructure provider API clients (Hetzner Cloud, Hetzner Robot, CloudNS) and a YAML-based infrastructure configuration parser. Zero framework dependencies — stdlib + yaml only.
+`core/go-infra` provides infrastructure provider API clients (Hetzner Cloud, Hetzner Robot, CloudNS) and a YAML-based infrastructure configuration parser. Dependencies: `go-log` (error handling), `go-io` (file I/O), `yaml.v3`, and `testify` (tests).
 
 ## Build & Test
 
@@ -35,6 +35,8 @@ These are subcommands for the parent `core` CLI, registered via `cli.RegisterCom
 ## Coding Standards
 
 - UK English in comments and strings
+- **Error handling**: Use `coreerr.E()` from `go-log`, never `fmt.Errorf` or `errors.New`
+- **File I/O**: Use `coreio.Local.Read()` from `go-io`, never `os.ReadFile`
 - Tests use `testify` (`assert` + `require`)
 - Test naming: `TestType_Method_Good`, `TestType_Method_Bad`, `TestType_Method_Ugly` suffixes (Good = happy path, Bad = expected errors, Ugly = edge cases)
 - Tests use `httptest.NewServer` for HTTP mocking — no mock libraries
