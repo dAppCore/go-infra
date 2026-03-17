@@ -144,7 +144,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Server errors are retryable.
 		if resp.StatusCode >= 500 {
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -153,7 +153,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Client errors (4xx, except 429 handled above) are not retried.
 		if resp.StatusCode >= 400 {
-			return coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			return coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 		}
 
 		// Success — decode if requested.
@@ -228,7 +228,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 500 {
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -236,7 +236,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 400 {
-			return nil, coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			return nil, coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 		}
 
 		return data, nil
@@ -259,6 +259,17 @@ func (a *APIClient) backoff(attempt int, req *http.Request) {
 	case <-req.Context().Done():
 	case <-time.After(d):
 	}
+}
+
+// maxErrBodyLen is the maximum number of bytes from a response body included in error messages.
+const maxErrBodyLen = 256
+
+// truncateBody limits response body length in error messages to prevent sensitive data leakage.
+func truncateBody(data []byte, max int) string {
+	if len(data) <= max {
+		return string(data)
+	}
+	return string(data[:max]) + "...(truncated)"
 }
 
 // parseRetryAfter interprets the Retry-After header value.

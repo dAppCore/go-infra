@@ -116,7 +116,7 @@ func TestHCloudClient_Do_Bad_APIError(t *testing.T) {
 	var result struct{}
 	err := client.get(context.Background(), "/servers", &result)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hcloud API 403")
+	assert.Contains(t, err.Error(), "hcloud API: HTTP 403")
 }
 
 func TestHCloudClient_Do_Bad_APIErrorNoJSON(t *testing.T) {
@@ -136,7 +136,7 @@ func TestHCloudClient_Do_Bad_APIErrorNoJSON(t *testing.T) {
 
 	err := client.get(context.Background(), "/servers", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hcloud API 500")
+	assert.Contains(t, err.Error(), "hcloud API: HTTP 500")
 }
 
 func TestHCloudClient_Do_Good_NilResult(t *testing.T) {
@@ -218,7 +218,7 @@ func TestHRobotClient_Get_Bad_HTTPError(t *testing.T) {
 
 	err := client.get(context.Background(), "/server", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "hrobot API 401")
+	assert.Contains(t, err.Error(), "hrobot API: HTTP 401")
 }
 
 // --- Type serialisation ---

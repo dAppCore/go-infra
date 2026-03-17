@@ -78,7 +78,7 @@ func TestCloudNSClient_DoRaw_Bad_HTTPError(t *testing.T) {
 
 	_, err = client.doRaw(req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cloudns API 403")
+	assert.Contains(t, err.Error(), "cloudns API: HTTP 403")
 }
 
 func TestCloudNSClient_DoRaw_Bad_ServerError(t *testing.T) {
@@ -102,7 +102,7 @@ func TestCloudNSClient_DoRaw_Bad_ServerError(t *testing.T) {
 
 	_, err = client.doRaw(req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cloudns API 500")
+	assert.Contains(t, err.Error(), "cloudns API: HTTP 500")
 }
 
 // --- Zone JSON parsing ---
