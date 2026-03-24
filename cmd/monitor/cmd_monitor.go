@@ -210,7 +210,7 @@ func resolveRepos() ([]string, error) {
 func fetchRepoFindings(repoFullName string) ([]Finding, []string) {
 	var findings []Finding
 	var errs []string
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 
 	// Fetch code scanning alerts
 	codeFindings, err := fetchCodeScanningAlerts(repoFullName)
@@ -264,7 +264,7 @@ func fetchCodeScanningAlerts(repoFullName string) ([]Finding, error) {
 		return nil, log.E("monitor.fetchCodeScanning", "failed to parse response", err)
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -318,7 +318,7 @@ func fetchDependabotAlerts(repoFullName string) ([]Finding, error) {
 		return nil, log.E("monitor.fetchDependabot", "failed to parse response", err)
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -369,7 +369,7 @@ func fetchSecretScanningAlerts(repoFullName string) ([]Finding, error) {
 		return nil, log.E("monitor.fetchSecretScanning", "failed to parse response", err)
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -528,6 +528,15 @@ func outputTable(findings []Finding) error {
 	}
 
 	return nil
+}
+
+// repoShortName extracts the repo name from "org/repo" format.
+// Returns the full string if no "/" is present.
+func repoShortName(fullName string) string {
+	if i := strings.LastIndex(fullName, "/"); i >= 0 {
+		return fullName[i+1:]
+	}
+	return fullName
 }
 
 // truncate truncates a string to max runes (Unicode-safe)
