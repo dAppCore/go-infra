@@ -517,6 +517,172 @@ func TestCloudNSRecord_JSON_Good_EmptyMap(t *testing.T) {
 	assert.Empty(t, records)
 }
 
+// --- UpdateRecord round-trip ---
+
+func TestCloudNSClient_UpdateRecord_Good_ViaDoRaw(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
+		assert.Equal(t, "42", r.URL.Query().Get("record-id"))
+		assert.Equal(t, "www", r.URL.Query().Get("host"))
+		assert.Equal(t, "A", r.URL.Query().Get("record-type"))
+		assert.Equal(t, "5.6.7.8", r.URL.Query().Get("record"))
+		assert.Equal(t, "3600", r.URL.Query().Get("ttl"))
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was updated successfully."}`))
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	err := client.UpdateRecord(context.Background(), "example.com", "42", "www", "A", "5.6.7.8", 3600)
+	require.NoError(t, err)
+}
+
+func TestCloudNSClient_UpdateRecord_Bad_FailedStatus(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"Failed","statusDescription":"Record not found."}`))
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	err := client.UpdateRecord(context.Background(), "example.com", "999", "www", "A", "5.6.7.8", 3600)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Record not found")
+}
+
+// --- EnsureRecord round-trip ---
+
+func TestCloudNSClient_EnsureRecord_Good_AlreadyCorrect(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"www","record":"1.2.3.4","ttl":"3600","status":1}}`))
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "1.2.3.4", 3600)
+	require.NoError(t, err)
+	assert.False(t, changed, "should not change when record already correct")
+}
+
+func TestCloudNSClient_EnsureRecord_Good_NeedsUpdate(t *testing.T) {
+	callCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			// ListRecords — returns existing record with old value
+			_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"www","record":"1.2.3.4","ttl":"3600","status":1}}`))
+		} else {
+			// UpdateRecord
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "5.6.7.8", r.URL.Query().Get("record"))
+			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was updated successfully."}`))
+		}
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "5.6.7.8", 3600)
+	require.NoError(t, err)
+	assert.True(t, changed, "should change when record needs update")
+}
+
+func TestCloudNSClient_EnsureRecord_Good_NeedsCreate(t *testing.T) {
+	callCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			// ListRecords — no matching record
+			_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"other","record":"1.2.3.4","ttl":"3600","status":1}}`))
+		} else {
+			// CreateRecord
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "www", r.URL.Query().Get("host"))
+			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was created successfully.","data":{"id":99}}`))
+		}
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "1.2.3.4", 3600)
+	require.NoError(t, err)
+	assert.True(t, changed, "should change when record needs to be created")
+}
+
+// --- ClearACMEChallenge round-trip ---
+
+func TestCloudNSClient_ClearACMEChallenge_Good_ViaDoRaw(t *testing.T) {
+	callCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			// ListRecords — returns ACME challenge records
+			_, _ = w.Write([]byte(`{
+				"1":{"id":"1","type":"A","host":"www","record":"1.2.3.4","ttl":"3600","status":1},
+				"2":{"id":"2","type":"TXT","host":"_acme-challenge","record":"token1","ttl":"60","status":1}
+			}`))
+		} else {
+			// DeleteRecord
+			assert.Equal(t, http.MethodPost, r.Method)
+			assert.Equal(t, "2", r.URL.Query().Get("record-id"))
+			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was deleted successfully."}`))
+		}
+	}))
+	defer ts.Close()
+
+	client := NewCloudNSClient("12345", "secret")
+	client.baseURL = ts.URL
+	client.api = NewAPIClient(
+		WithHTTPClient(ts.Client()),
+		WithPrefix("cloudns API"),
+		WithRetry(RetryConfig{}),
+	)
+
+	err := client.ClearACMEChallenge(context.Background(), "example.com")
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, callCount, 2, "should have called list + delete")
+}
+
 func TestCloudNSClient_DoRaw_Good_AuthQueryParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "49500", r.URL.Query().Get("auth-id"))
