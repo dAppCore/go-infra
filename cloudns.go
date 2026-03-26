@@ -2,12 +2,11 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
 
-	coreerr "forge.lthn.ai/core/go-log"
+	core "dappco.re/go/core"
 )
 
 const cloudnsBaseURL = "https://api.cloudns.net"
@@ -63,7 +62,7 @@ func (c *CloudNSClient) ListZones(ctx context.Context) ([]CloudNSZone, error) {
 	}
 
 	var zones []CloudNSZone
-	if err := json.Unmarshal(data, &zones); err != nil {
+	if r := core.JSONUnmarshal(data, &zones); !r.OK {
 		// CloudNS returns an empty object {} for no results instead of []
 		return nil, nil
 	}
@@ -81,8 +80,8 @@ func (c *CloudNSClient) ListRecords(ctx context.Context, domain string) (map[str
 	}
 
 	var records map[string]CloudNSRecord
-	if err := json.Unmarshal(data, &records); err != nil {
-		return nil, coreerr.E("CloudNSClient.ListRecords", "parse records", err)
+	if r := core.JSONUnmarshal(data, &records); !r.OK {
+		return nil, core.E("CloudNSClient.ListRecords", "parse records", coreResultErr(r, "CloudNSClient.ListRecords"))
 	}
 	return records, nil
 }
@@ -108,12 +107,12 @@ func (c *CloudNSClient) CreateRecord(ctx context.Context, domain, host, recordTy
 			ID int `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", coreerr.E("CloudNSClient.CreateRecord", "parse response", err)
+	if r := core.JSONUnmarshal(data, &result); !r.OK {
+		return "", core.E("CloudNSClient.CreateRecord", "parse response", coreResultErr(r, "CloudNSClient.CreateRecord"))
 	}
 
 	if result.Status != "Success" {
-		return "", coreerr.E("CloudNSClient.CreateRecord", result.StatusDescription, nil)
+		return "", core.E("CloudNSClient.CreateRecord", result.StatusDescription, nil)
 	}
 
 	return strconv.Itoa(result.Data.ID), nil
@@ -138,12 +137,12 @@ func (c *CloudNSClient) UpdateRecord(ctx context.Context, domain, recordID, host
 		Status            string `json:"status"`
 		StatusDescription string `json:"statusDescription"`
 	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return coreerr.E("CloudNSClient.UpdateRecord", "parse response", err)
+	if r := core.JSONUnmarshal(data, &result); !r.OK {
+		return core.E("CloudNSClient.UpdateRecord", "parse response", coreResultErr(r, "CloudNSClient.UpdateRecord"))
 	}
 
 	if result.Status != "Success" {
-		return coreerr.E("CloudNSClient.UpdateRecord", result.StatusDescription, nil)
+		return core.E("CloudNSClient.UpdateRecord", result.StatusDescription, nil)
 	}
 
 	return nil
@@ -164,12 +163,12 @@ func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID strin
 		Status            string `json:"status"`
 		StatusDescription string `json:"statusDescription"`
 	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return coreerr.E("CloudNSClient.DeleteRecord", "parse response", err)
+	if r := core.JSONUnmarshal(data, &result); !r.OK {
+		return core.E("CloudNSClient.DeleteRecord", "parse response", coreResultErr(r, "CloudNSClient.DeleteRecord"))
 	}
 
 	if result.Status != "Success" {
-		return coreerr.E("CloudNSClient.DeleteRecord", result.StatusDescription, nil)
+		return core.E("CloudNSClient.DeleteRecord", result.StatusDescription, nil)
 	}
 
 	return nil
@@ -180,7 +179,7 @@ func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID strin
 func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordType, value string, ttl int) (bool, error) {
 	records, err := c.ListRecords(ctx, domain)
 	if err != nil {
-		return false, coreerr.E("CloudNSClient.EnsureRecord", "list records", err)
+		return false, core.E("CloudNSClient.EnsureRecord", "list records", err)
 	}
 
 	// Check if record already exists
@@ -191,7 +190,7 @@ func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordTy
 			}
 			// Update existing record
 			if err := c.UpdateRecord(ctx, domain, id, host, recordType, value, ttl); err != nil {
-				return false, coreerr.E("CloudNSClient.EnsureRecord", "update record", err)
+				return false, core.E("CloudNSClient.EnsureRecord", "update record", err)
 			}
 			return true, nil
 		}
@@ -199,7 +198,7 @@ func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordTy
 
 	// Create new record
 	if _, err := c.CreateRecord(ctx, domain, host, recordType, value, ttl); err != nil {
-		return false, coreerr.E("CloudNSClient.EnsureRecord", "create record", err)
+		return false, core.E("CloudNSClient.EnsureRecord", "create record", err)
 	}
 	return true, nil
 }

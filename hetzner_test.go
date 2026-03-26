@@ -2,11 +2,12 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	core "dappco.re/go/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +42,7 @@ func TestHCloudClient_ListServers_Good(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		writeCoreJSON(t, w, resp)
 	})
 
 	ts := httptest.NewServer(mux)
@@ -274,8 +275,7 @@ func TestHCloudClient_CreateLoadBalancer_Good(t *testing.T) {
 		assert.Equal(t, "/load_balancers", r.URL.Path)
 
 		var body HCloudLBCreateRequest
-		err := json.NewDecoder(r.Body).Decode(&body)
-		require.NoError(t, err)
+		decodeCoreJSONBody(t, r, &body)
 		assert.Equal(t, "hermes", body.Name)
 		assert.Equal(t, "lb11", body.LoadBalancerType)
 		assert.Equal(t, "round_robin", body.Algorithm.Type)
@@ -333,8 +333,7 @@ func TestHCloudClient_CreateSnapshot_Good(t *testing.T) {
 		assert.Equal(t, "/servers/123/actions/create_image", r.URL.Path)
 
 		var body map[string]string
-		err := json.NewDecoder(r.Body).Decode(&body)
-		require.NoError(t, err)
+		decodeCoreJSONBody(t, r, &body)
 		assert.Equal(t, "daily backup", body["description"])
 		assert.Equal(t, "snapshot", body["type"])
 
@@ -399,9 +398,7 @@ func TestHCloudServer_JSON_Good(t *testing.T) {
 	}`
 
 	var server HCloudServer
-	err := json.Unmarshal([]byte(data), &server)
-
-	require.NoError(t, err)
+	requireHetznerJSON(t, data, &server)
 	assert.Equal(t, 123, server.ID)
 	assert.Equal(t, "web-1", server.Name)
 	assert.Equal(t, "running", server.Status)
@@ -431,9 +428,7 @@ func TestHCloudLoadBalancer_JSON_Good(t *testing.T) {
 	}`
 
 	var lb HCloudLoadBalancer
-	err := json.Unmarshal([]byte(data), &lb)
-
-	require.NoError(t, err)
+	requireHetznerJSON(t, data, &lb)
 	assert.Equal(t, 789, lb.ID)
 	assert.Equal(t, "hermes", lb.Name)
 	assert.True(t, lb.PublicNet.Enabled)
@@ -460,9 +455,7 @@ func TestHRobotServer_JSON_Good(t *testing.T) {
 	}`
 
 	var server HRobotServer
-	err := json.Unmarshal([]byte(data), &server)
-
-	require.NoError(t, err)
+	requireHetznerJSON(t, data, &server)
 	assert.Equal(t, "1.2.3.4", server.ServerIP)
 	assert.Equal(t, "noc", server.ServerName)
 	assert.Equal(t, "EX44", server.Product)
@@ -470,4 +463,29 @@ func TestHRobotServer_JSON_Good(t *testing.T) {
 	assert.Equal(t, "ready", server.Status)
 	assert.False(t, server.Cancelled)
 	assert.Equal(t, "2026-03-01", server.PaidUntil)
+}
+
+func requireHetznerJSON(t *testing.T, data string, target any) {
+	t.Helper()
+
+	r := core.JSONUnmarshal([]byte(data), target)
+	require.True(t, r.OK)
+}
+
+func writeCoreJSON(t *testing.T, w http.ResponseWriter, value any) {
+	t.Helper()
+
+	r := core.JSONMarshal(value)
+	require.True(t, r.OK)
+	_, err := w.Write(r.Value.([]byte))
+	require.NoError(t, err)
+}
+
+func decodeCoreJSONBody(t *testing.T, r *http.Request, target any) {
+	t.Helper()
+
+	body, err := io.ReadAll(r.Body)
+	require.NoError(t, err)
+	result := core.JSONUnmarshal(body, target)
+	require.True(t, result.OK)
 }

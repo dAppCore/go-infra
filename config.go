@@ -3,11 +3,7 @@
 package infra
 
 import (
-	"os"
-	"path/filepath"
-
-	coreerr "forge.lthn.ai/core/go-log"
-	coreio "forge.lthn.ai/core/go-io"
+	core "dappco.re/go/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -230,14 +226,14 @@ type BackupJob struct {
 
 // Load reads and parses an infra.yaml file.
 func Load(path string) (*Config, error) {
-	data, err := coreio.Local.Read(path)
-	if err != nil {
-		return nil, coreerr.E("infra.Load", "read infra config", err)
+	read := localFS.Read(path)
+	if !read.OK {
+		return nil, core.E("infra.Load", "read infra config", coreResultErr(read, "infra.Load"))
 	}
 
 	var cfg Config
-	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return nil, coreerr.E("infra.Load", "parse infra config", err)
+	if err := yaml.Unmarshal([]byte(read.Value.(string)), &cfg); err != nil {
+		return nil, core.E("infra.Load", "parse infra config", err)
 	}
 
 	// Expand SSH key paths
@@ -257,19 +253,19 @@ func Load(path string) (*Config, error) {
 func Discover(startDir string) (*Config, string, error) {
 	dir := startDir
 	for {
-		path := filepath.Join(dir, "infra.yaml")
-		if _, err := os.Stat(path); err == nil {
+		path := core.JoinPath(dir, "infra.yaml")
+		if localFS.Exists(path) {
 			cfg, err := Load(path)
 			return cfg, path, err
 		}
 
-		parent := filepath.Dir(dir)
+		parent := core.PathDir(dir)
 		if parent == dir {
 			break
 		}
 		dir = parent
 	}
-	return nil, "", coreerr.E("infra.Discover", "infra.yaml not found (searched from "+startDir+")", nil)
+	return nil, "", core.E("infra.Discover", core.Concat("infra.yaml not found (searched from ", startDir, ")"), nil)
 }
 
 // HostsByRole returns all hosts matching the given role.
@@ -290,12 +286,19 @@ func (c *Config) AppServers() map[string]*Host {
 
 // expandPath expands ~ to home directory.
 func expandPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
+	if core.HasPrefix(path, "~") {
+		home := core.Env("DIR_HOME")
+		if home == "" {
 			return path
 		}
-		return filepath.Join(home, path[1:])
+		suffix := core.TrimPrefix(path, "~")
+		if suffix == "" {
+			return home
+		}
+		if core.HasPrefix(suffix, "/") {
+			return core.Concat(home, suffix)
+		}
+		return core.JoinPath(home, suffix)
 	}
 	return path
 }

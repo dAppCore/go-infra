@@ -2,11 +2,11 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	core "dappco.re/go/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,9 +114,7 @@ func TestCloudNSZone_JSON_Good(t *testing.T) {
 	]`
 
 	var zones []CloudNSZone
-	err := json.Unmarshal([]byte(data), &zones)
-
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &zones)
 	require.Len(t, zones, 2)
 	assert.Equal(t, "example.com", zones[0].Name)
 	assert.Equal(t, "master", zones[0].Type)
@@ -128,10 +126,10 @@ func TestCloudNSZone_JSON_Good_EmptyResponse(t *testing.T) {
 	data := `{}`
 
 	var zones []CloudNSZone
-	err := json.Unmarshal([]byte(data), &zones)
+	r := core.JSONUnmarshal([]byte(data), &zones)
 
 	// Should fail to parse as slice — this is the edge case ListZones handles
-	assert.Error(t, err)
+	assert.False(t, r.OK)
 }
 
 // --- Record JSON parsing ---
@@ -158,9 +156,7 @@ func TestCloudNSRecord_JSON_Good(t *testing.T) {
 	}`
 
 	var records map[string]CloudNSRecord
-	err := json.Unmarshal([]byte(data), &records)
-
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &records)
 	require.Len(t, records, 2)
 
 	aRecord := records["12345"]
@@ -190,9 +186,7 @@ func TestCloudNSRecord_JSON_Good_TXTRecord(t *testing.T) {
 	}`
 
 	var records map[string]CloudNSRecord
-	err := json.Unmarshal([]byte(data), &records)
-
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &records)
 	require.Len(t, records, 1)
 
 	txt := records["99"]
@@ -215,8 +209,7 @@ func TestCloudNSClient_CreateRecord_Good_ResponseParsing(t *testing.T) {
 		} `json:"data"`
 	}
 
-	err := json.Unmarshal([]byte(data), &result)
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &result)
 	assert.Equal(t, "Success", result.Status)
 	assert.Equal(t, 54321, result.Data.ID)
 }
@@ -229,8 +222,7 @@ func TestCloudNSClient_CreateRecord_Bad_FailedStatus(t *testing.T) {
 		StatusDescription string `json:"statusDescription"`
 	}
 
-	err := json.Unmarshal([]byte(data), &result)
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &result)
 	assert.Equal(t, "Failed", result.Status)
 	assert.Equal(t, "Record already exists.", result.StatusDescription)
 }
@@ -245,8 +237,7 @@ func TestCloudNSClient_UpdateDelete_Good_ResponseParsing(t *testing.T) {
 		StatusDescription string `json:"statusDescription"`
 	}
 
-	err := json.Unmarshal([]byte(data), &result)
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &result)
 	assert.Equal(t, "Success", result.Status)
 }
 
@@ -511,10 +502,15 @@ func TestCloudNSRecord_JSON_Good_EmptyMap(t *testing.T) {
 	data := `{}`
 
 	var records map[string]CloudNSRecord
-	err := json.Unmarshal([]byte(data), &records)
-
-	require.NoError(t, err)
+	requireCloudNSJSON(t, data, &records)
 	assert.Empty(t, records)
+}
+
+func requireCloudNSJSON(t *testing.T, data string, target any) {
+	t.Helper()
+
+	r := core.JSONUnmarshal([]byte(data), target)
+	require.True(t, r.OK)
 }
 
 // --- UpdateRecord round-trip ---

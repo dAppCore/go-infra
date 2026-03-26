@@ -2,8 +2,9 @@ package infra
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
+
+	core "dappco.re/go/core"
 )
 
 func TestLoad_Good(t *testing.T) {
@@ -68,9 +69,9 @@ func TestLoad_Bad(t *testing.T) {
 
 func TestLoad_Ugly(t *testing.T) {
 	// Invalid YAML
-	tmp := filepath.Join(t.TempDir(), "infra.yaml")
-	if err := os.WriteFile(tmp, []byte("{{invalid yaml"), 0644); err != nil {
-		t.Fatal(err)
+	tmp := core.JoinPath(t.TempDir(), "infra.yaml")
+	if r := localFS.WriteMode(tmp, "{{invalid yaml", 0644); !r.OK {
+		t.Fatal(coreResultErr(r, "TestLoad_Ugly"))
 	}
 
 	_, err := Load(tmp)
@@ -129,13 +130,13 @@ func TestConfig_AppServers_Good(t *testing.T) {
 }
 
 func TestExpandPath(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	home := core.Env("DIR_HOME")
 
 	tests := []struct {
 		input string
 		want  string
 	}{
-		{"~/.ssh/id_rsa", filepath.Join(home, ".ssh/id_rsa")},
+		{"~/.ssh/id_rsa", core.JoinPath(home, ".ssh", "id_rsa")},
 		{"/absolute/path", "/absolute/path"},
 		{"relative/path", "relative/path"},
 	}

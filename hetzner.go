@@ -2,12 +2,9 @@ package infra
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"strings"
 
-	coreerr "forge.lthn.ai/core/go-log"
+	core "dappco.re/go/core"
 )
 
 const (
@@ -202,7 +199,7 @@ func (c *HCloudClient) GetLoadBalancer(ctx context.Context, id int) (*HCloudLoad
 	var result struct {
 		LoadBalancer HCloudLoadBalancer `json:"load_balancer"`
 	}
-	if err := c.get(ctx, fmt.Sprintf("/load_balancers/%d", id), &result); err != nil {
+	if err := c.get(ctx, core.Sprintf("/load_balancers/%d", id), &result); err != nil {
 		return nil, err
 	}
 	return &result.LoadBalancer, nil
@@ -210,10 +207,11 @@ func (c *HCloudClient) GetLoadBalancer(ctx context.Context, id int) (*HCloudLoad
 
 // CreateLoadBalancer creates a new load balancer.
 func (c *HCloudClient) CreateLoadBalancer(ctx context.Context, req HCloudLBCreateRequest) (*HCloudLoadBalancer, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, coreerr.E("HCloudClient.CreateLoadBalancer", "marshal request", err)
+	marshaled := core.JSONMarshal(req)
+	if !marshaled.OK {
+		return nil, core.E("HCloudClient.CreateLoadBalancer", "marshal request", coreResultErr(marshaled, "HCloudClient.CreateLoadBalancer"))
 	}
+	body := marshaled.Value.([]byte)
 
 	var result struct {
 		LoadBalancer HCloudLoadBalancer `json:"load_balancer"`
@@ -226,16 +224,19 @@ func (c *HCloudClient) CreateLoadBalancer(ctx context.Context, req HCloudLBCreat
 
 // DeleteLoadBalancer deletes a load balancer by ID.
 func (c *HCloudClient) DeleteLoadBalancer(ctx context.Context, id int) error {
-	return c.delete(ctx, fmt.Sprintf("/load_balancers/%d", id))
+	return c.delete(ctx, core.Sprintf("/load_balancers/%d", id))
 }
 
 // CreateSnapshot creates a server snapshot.
 func (c *HCloudClient) CreateSnapshot(ctx context.Context, serverID int, description string) error {
-	body, _ := json.Marshal(map[string]string{
+	marshaled := core.JSONMarshal(map[string]string{
 		"description": description,
 		"type":        "snapshot",
 	})
-	return c.post(ctx, fmt.Sprintf("/servers/%d/actions/create_image", serverID), body, nil)
+	if !marshaled.OK {
+		return core.E("HCloudClient.CreateSnapshot", "marshal request", coreResultErr(marshaled, "HCloudClient.CreateSnapshot"))
+	}
+	return c.post(ctx, core.Sprintf("/servers/%d/actions/create_image", serverID), marshaled.Value.([]byte), nil)
 }
 
 func (c *HCloudClient) get(ctx context.Context, path string, result any) error {
@@ -247,7 +248,7 @@ func (c *HCloudClient) get(ctx context.Context, path string, result any) error {
 }
 
 func (c *HCloudClient) post(ctx context.Context, path string, body []byte, result any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, strings.NewReader(string(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, core.NewReader(string(body)))
 	if err != nil {
 		return err
 	}
