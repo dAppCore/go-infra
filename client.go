@@ -13,6 +13,7 @@ import (
 )
 
 // RetryConfig controls exponential backoff retry behaviour.
+// Usage: cfg := infra.RetryConfig{}
 type RetryConfig struct {
 	// MaxRetries is the maximum number of retry attempts (0 = no retries).
 	MaxRetries int
@@ -23,6 +24,7 @@ type RetryConfig struct {
 }
 
 // DefaultRetryConfig returns sensible defaults: 3 retries, 100ms initial, 5s max.
+// Usage: cfg := infra.DefaultRetryConfig()
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
 		MaxRetries:     3,
@@ -34,6 +36,7 @@ func DefaultRetryConfig() RetryConfig {
 // APIClient is a shared HTTP client with retry, rate-limit handling,
 // and configurable authentication. Provider-specific clients embed or
 // delegate to this struct.
+// Usage: client := infra.NewAPIClient()
 type APIClient struct {
 	client       *http.Client
 	retry        RetryConfig
@@ -44,29 +47,35 @@ type APIClient struct {
 }
 
 // APIClientOption configures an APIClient.
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("api"))
 type APIClientOption func(*APIClient)
 
 // WithHTTPClient sets a custom http.Client.
+// Usage: client := infra.NewAPIClient(infra.WithHTTPClient(http.DefaultClient))
 func WithHTTPClient(c *http.Client) APIClientOption {
 	return func(a *APIClient) { a.client = c }
 }
 
 // WithRetry sets the retry configuration.
+// Usage: client := infra.NewAPIClient(infra.WithRetry(infra.DefaultRetryConfig()))
 func WithRetry(cfg RetryConfig) APIClientOption {
 	return func(a *APIClient) { a.retry = cfg }
 }
 
 // WithAuth sets the authentication function applied to every request.
+// Usage: client := infra.NewAPIClient(infra.WithAuth(func(req *http.Request) {}))
 func WithAuth(fn func(req *http.Request)) APIClientOption {
 	return func(a *APIClient) { a.authFn = fn }
 }
 
 // WithPrefix sets the error message prefix (e.g. "hcloud API").
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("hcloud API"))
 func WithPrefix(p string) APIClientOption {
 	return func(a *APIClient) { a.prefix = p }
 }
 
 // NewAPIClient creates a new APIClient with the given options.
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("cloudns API"))
 func NewAPIClient(opts ...APIClientOption) *APIClient {
 	a := &APIClient{
 		client: &http.Client{Timeout: 30 * time.Second},
@@ -82,6 +91,7 @@ func NewAPIClient(opts ...APIClientOption) *APIClient {
 // Do executes an HTTP request with authentication, retry logic, and
 // rate-limit handling. If result is non-nil, the response body is
 // JSON-decoded into it.
+// Usage: err := client.Do(req, &result)
 func (a *APIClient) Do(req *http.Request, result any) error {
 	if a.authFn != nil {
 		a.authFn(req)
@@ -168,6 +178,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 // DoRaw executes a request and returns the raw response body.
 // Same retry/rate-limit logic as Do but without JSON decoding.
+// Usage: body, err := client.DoRaw(req)
 func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 	if a.authFn != nil {
 		a.authFn(req)

@@ -12,6 +12,7 @@ import (
 const cloudnsBaseURL = "https://api.cloudns.net"
 
 // CloudNSClient is an HTTP client for the CloudNS DNS API.
+// Usage: dns := infra.NewCloudNSClient(authID, password)
 type CloudNSClient struct {
 	authID   string
 	password string
@@ -21,6 +22,7 @@ type CloudNSClient struct {
 
 // NewCloudNSClient creates a new CloudNS API client.
 // Uses sub-auth-user (auth-id) authentication.
+// Usage: dns := infra.NewCloudNSClient(authID, password)
 func NewCloudNSClient(authID, password string) *CloudNSClient {
 	return &CloudNSClient{
 		authID:   authID,
@@ -31,6 +33,7 @@ func NewCloudNSClient(authID, password string) *CloudNSClient {
 }
 
 // CloudNSZone represents a DNS zone.
+// Usage: zone := infra.CloudNSZone{}
 type CloudNSZone struct {
 	Name   string `json:"name"`
 	Type   string `json:"type"`
@@ -39,6 +42,7 @@ type CloudNSZone struct {
 }
 
 // CloudNSRecord represents a DNS record.
+// Usage: record := infra.CloudNSRecord{}
 type CloudNSRecord struct {
 	ID       string `json:"id"`
 	Type     string `json:"type"`
@@ -50,6 +54,7 @@ type CloudNSRecord struct {
 }
 
 // ListZones returns all DNS zones.
+// Usage: zones, err := dns.ListZones(ctx)
 func (c *CloudNSClient) ListZones(ctx context.Context) ([]CloudNSZone, error) {
 	params := c.authParams()
 	params.Set("page", "1")
@@ -70,6 +75,7 @@ func (c *CloudNSClient) ListZones(ctx context.Context) ([]CloudNSZone, error) {
 }
 
 // ListRecords returns all DNS records for a zone.
+// Usage: records, err := dns.ListRecords(ctx, "example.com")
 func (c *CloudNSClient) ListRecords(ctx context.Context, domain string) (map[string]CloudNSRecord, error) {
 	params := c.authParams()
 	params.Set("domain-name", domain)
@@ -87,6 +93,7 @@ func (c *CloudNSClient) ListRecords(ctx context.Context, domain string) (map[str
 }
 
 // CreateRecord creates a DNS record. Returns the record ID.
+// Usage: id, err := dns.CreateRecord(ctx, "example.com", "www", "A", "1.2.3.4", 300)
 func (c *CloudNSClient) CreateRecord(ctx context.Context, domain, host, recordType, value string, ttl int) (string, error) {
 	params := c.authParams()
 	params.Set("domain-name", domain)
@@ -119,6 +126,7 @@ func (c *CloudNSClient) CreateRecord(ctx context.Context, domain, host, recordTy
 }
 
 // UpdateRecord updates an existing DNS record.
+// Usage: err := dns.UpdateRecord(ctx, "example.com", "123", "www", "A", "1.2.3.4", 300)
 func (c *CloudNSClient) UpdateRecord(ctx context.Context, domain, recordID, host, recordType, value string, ttl int) error {
 	params := c.authParams()
 	params.Set("domain-name", domain)
@@ -149,6 +157,7 @@ func (c *CloudNSClient) UpdateRecord(ctx context.Context, domain, recordID, host
 }
 
 // DeleteRecord deletes a DNS record by ID.
+// Usage: err := dns.DeleteRecord(ctx, "example.com", "123")
 func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID string) error {
 	params := c.authParams()
 	params.Set("domain-name", domain)
@@ -176,6 +185,7 @@ func (c *CloudNSClient) DeleteRecord(ctx context.Context, domain, recordID strin
 
 // EnsureRecord creates or updates a DNS record to match the desired state.
 // Returns true if a change was made.
+// Usage: changed, err := dns.EnsureRecord(ctx, "example.com", "www", "A", "1.2.3.4", 300)
 func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordType, value string, ttl int) (bool, error) {
 	records, err := c.ListRecords(ctx, domain)
 	if err != nil {
@@ -204,11 +214,13 @@ func (c *CloudNSClient) EnsureRecord(ctx context.Context, domain, host, recordTy
 }
 
 // SetACMEChallenge creates a DNS-01 ACME challenge TXT record.
+// Usage: id, err := dns.SetACMEChallenge(ctx, "example.com", token)
 func (c *CloudNSClient) SetACMEChallenge(ctx context.Context, domain, value string) (string, error) {
 	return c.CreateRecord(ctx, domain, "_acme-challenge", "TXT", value, 60)
 }
 
 // ClearACMEChallenge removes the DNS-01 ACME challenge TXT record.
+// Usage: err := dns.ClearACMEChallenge(ctx, "example.com")
 func (c *CloudNSClient) ClearACMEChallenge(ctx context.Context, domain string) error {
 	records, err := c.ListRecords(ctx, domain)
 	if err != nil {

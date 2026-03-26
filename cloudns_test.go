@@ -13,7 +13,7 @@ import (
 
 // --- Constructor ---
 
-func TestNewCloudNSClient_Good(t *testing.T) {
+func TestCloudNS_NewCloudNSClient_Good(t *testing.T) {
 	c := NewCloudNSClient("12345", "secret")
 	assert.NotNil(t, c)
 	assert.Equal(t, "12345", c.authID)
@@ -23,7 +23,7 @@ func TestNewCloudNSClient_Good(t *testing.T) {
 
 // --- authParams ---
 
-func TestCloudNSClient_AuthParams_Good(t *testing.T) {
+func TestCloudNS_CloudNSClient_AuthParams_Good(t *testing.T) {
 	c := NewCloudNSClient("49500", "hunter2")
 	params := c.authParams()
 
@@ -33,7 +33,7 @@ func TestCloudNSClient_AuthParams_Good(t *testing.T) {
 
 // --- doRaw ---
 
-func TestCloudNSClient_DoRaw_Good_ReturnsBody(t *testing.T) {
+func TestCloudNS_CloudNSClient_DoRaw_ReturnsBody_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Success"}`))
@@ -57,7 +57,7 @@ func TestCloudNSClient_DoRaw_Good_ReturnsBody(t *testing.T) {
 	assert.Contains(t, string(data), "Success")
 }
 
-func TestCloudNSClient_DoRaw_Bad_HTTPError(t *testing.T) {
+func TestCloudNS_CloudNSClient_DoRaw_HTTPError_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"status":"Failed","statusDescription":"Invalid auth"}`))
@@ -81,7 +81,7 @@ func TestCloudNSClient_DoRaw_Bad_HTTPError(t *testing.T) {
 	assert.Contains(t, err.Error(), "cloudns API: HTTP 403")
 }
 
-func TestCloudNSClient_DoRaw_Bad_ServerError(t *testing.T) {
+func TestCloudNS_CloudNSClient_DoRaw_ServerError_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`Internal Server Error`))
@@ -107,7 +107,7 @@ func TestCloudNSClient_DoRaw_Bad_ServerError(t *testing.T) {
 
 // --- Zone JSON parsing ---
 
-func TestCloudNSZone_JSON_Good(t *testing.T) {
+func TestCloudNS_CloudNSZone_JSON_Good(t *testing.T) {
 	data := `[
 		{"name": "example.com", "type": "master", "zone": "domain", "status": "1"},
 		{"name": "test.io", "type": "master", "zone": "domain", "status": "1"}
@@ -121,7 +121,7 @@ func TestCloudNSZone_JSON_Good(t *testing.T) {
 	assert.Equal(t, "test.io", zones[1].Name)
 }
 
-func TestCloudNSZone_JSON_Good_EmptyResponse(t *testing.T) {
+func TestCloudNS_CloudNSZone_JSON_EmptyResponse_Good(t *testing.T) {
 	// CloudNS returns {} for no zones, not []
 	data := `{}`
 
@@ -134,7 +134,7 @@ func TestCloudNSZone_JSON_Good_EmptyResponse(t *testing.T) {
 
 // --- Record JSON parsing ---
 
-func TestCloudNSRecord_JSON_Good(t *testing.T) {
+func TestCloudNS_CloudNSRecord_JSON_Good(t *testing.T) {
 	data := `{
 		"12345": {
 			"id": "12345",
@@ -173,7 +173,7 @@ func TestCloudNSRecord_JSON_Good(t *testing.T) {
 	assert.Equal(t, "10", mxRecord.Priority)
 }
 
-func TestCloudNSRecord_JSON_Good_TXTRecord(t *testing.T) {
+func TestCloudNS_CloudNSRecord_JSON_TXTRecord_Good(t *testing.T) {
 	data := `{
 		"99": {
 			"id": "99",
@@ -198,7 +198,7 @@ func TestCloudNSRecord_JSON_Good_TXTRecord(t *testing.T) {
 
 // --- CreateRecord response parsing ---
 
-func TestCloudNSClient_CreateRecord_Good_ResponseParsing(t *testing.T) {
+func TestCloudNS_CloudNSClient_CreateRecord_ResponseParsing_Good(t *testing.T) {
 	data := `{"status":"Success","statusDescription":"The record was created successfully.","data":{"id":54321}}`
 
 	var result struct {
@@ -214,7 +214,7 @@ func TestCloudNSClient_CreateRecord_Good_ResponseParsing(t *testing.T) {
 	assert.Equal(t, 54321, result.Data.ID)
 }
 
-func TestCloudNSClient_CreateRecord_Bad_FailedStatus(t *testing.T) {
+func TestCloudNS_CloudNSClient_CreateRecord_FailedStatus_Bad(t *testing.T) {
 	data := `{"status":"Failed","statusDescription":"Record already exists."}`
 
 	var result struct {
@@ -229,7 +229,7 @@ func TestCloudNSClient_CreateRecord_Bad_FailedStatus(t *testing.T) {
 
 // --- UpdateRecord/DeleteRecord response parsing ---
 
-func TestCloudNSClient_UpdateDelete_Good_ResponseParsing(t *testing.T) {
+func TestCloudNS_CloudNSClient_UpdateDelete_ResponseParsing_Good(t *testing.T) {
 	data := `{"status":"Success","statusDescription":"The record was updated successfully."}`
 
 	var result struct {
@@ -243,7 +243,7 @@ func TestCloudNSClient_UpdateDelete_Good_ResponseParsing(t *testing.T) {
 
 // --- Full round-trip tests via doRaw ---
 
-func TestCloudNSClient_ListZones_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_ListZones_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.NotEmpty(t, r.URL.Query().Get("auth-id"))
 		assert.NotEmpty(t, r.URL.Query().Get("auth-password"))
@@ -267,7 +267,7 @@ func TestCloudNSClient_ListZones_Good_ViaDoRaw(t *testing.T) {
 	assert.Equal(t, "example.com", zones[0].Name)
 }
 
-func TestCloudNSClient_ListRecords_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_ListRecords_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
 
@@ -294,7 +294,7 @@ func TestCloudNSClient_ListRecords_Good_ViaDoRaw(t *testing.T) {
 	assert.Equal(t, "CNAME", records["2"].Type)
 }
 
-func TestCloudNSClient_CreateRecord_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_CreateRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
@@ -321,7 +321,7 @@ func TestCloudNSClient_CreateRecord_Good_ViaDoRaw(t *testing.T) {
 	assert.Equal(t, "99", id)
 }
 
-func TestCloudNSClient_DeleteRecord_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_DeleteRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
@@ -346,7 +346,7 @@ func TestCloudNSClient_DeleteRecord_Good_ViaDoRaw(t *testing.T) {
 
 // --- ACME challenge helpers ---
 
-func TestCloudNSClient_SetACMEChallenge_Good_ParamVerification(t *testing.T) {
+func TestCloudNS_CloudNSClient_SetACMEChallenge_ParamVerification_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
 		assert.Equal(t, "_acme-challenge", r.URL.Query().Get("host"))
@@ -371,7 +371,7 @@ func TestCloudNSClient_SetACMEChallenge_Good_ParamVerification(t *testing.T) {
 	assert.Equal(t, "777", id)
 }
 
-func TestCloudNSClient_ClearACMEChallenge_Good_Logic(t *testing.T) {
+func TestCloudNS_CloudNSClient_ClearACMEChallenge_Logic_Good(t *testing.T) {
 	records := map[string]CloudNSRecord{
 		"1": {ID: "1", Type: "A", Host: "www", Record: "1.2.3.4"},
 		"2": {ID: "2", Type: "TXT", Host: "_acme-challenge", Record: "token1"},
@@ -393,7 +393,7 @@ func TestCloudNSClient_ClearACMEChallenge_Good_Logic(t *testing.T) {
 
 // --- EnsureRecord logic ---
 
-func TestEnsureRecord_Good_Logic_AlreadyCorrect(t *testing.T) {
+func TestCloudNS_EnsureRecord_Logic_AlreadyCorrect_Good(t *testing.T) {
 	records := map[string]CloudNSRecord{
 		"10": {ID: "10", Type: "A", Host: "www", Record: "1.2.3.4"},
 	}
@@ -432,7 +432,7 @@ func TestEnsureRecord_Good_Logic_AlreadyCorrect(t *testing.T) {
 	assert.False(t, needsCreate, "should not need create when record exists")
 }
 
-func TestEnsureRecord_Good_Logic_NeedsUpdate(t *testing.T) {
+func TestCloudNS_EnsureRecord_Logic_NeedsUpdate_Good(t *testing.T) {
 	records := map[string]CloudNSRecord{
 		"10": {ID: "10", Type: "A", Host: "www", Record: "1.2.3.4"},
 	}
@@ -454,7 +454,7 @@ func TestEnsureRecord_Good_Logic_NeedsUpdate(t *testing.T) {
 	assert.True(t, needsUpdate, "should need update when value differs")
 }
 
-func TestEnsureRecord_Good_Logic_NeedsCreate(t *testing.T) {
+func TestCloudNS_EnsureRecord_Logic_NeedsCreate_Good(t *testing.T) {
 	records := map[string]CloudNSRecord{
 		"10": {ID: "10", Type: "A", Host: "www", Record: "1.2.3.4"},
 	}
@@ -475,7 +475,7 @@ func TestEnsureRecord_Good_Logic_NeedsCreate(t *testing.T) {
 
 // --- Edge cases ---
 
-func TestCloudNSClient_DoRaw_Good_EmptyBody(t *testing.T) {
+func TestCloudNS_CloudNSClient_DoRaw_EmptyBody_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -498,7 +498,7 @@ func TestCloudNSClient_DoRaw_Good_EmptyBody(t *testing.T) {
 	assert.Empty(t, data)
 }
 
-func TestCloudNSRecord_JSON_Good_EmptyMap(t *testing.T) {
+func TestCloudNS_CloudNSRecord_JSON_EmptyMap_Good(t *testing.T) {
 	data := `{}`
 
 	var records map[string]CloudNSRecord
@@ -515,7 +515,7 @@ func requireCloudNSJSON(t *testing.T, data string, target any) {
 
 // --- UpdateRecord round-trip ---
 
-func TestCloudNSClient_UpdateRecord_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_UpdateRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
@@ -542,7 +542,7 @@ func TestCloudNSClient_UpdateRecord_Good_ViaDoRaw(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCloudNSClient_UpdateRecord_Bad_FailedStatus(t *testing.T) {
+func TestCloudNS_CloudNSClient_UpdateRecord_FailedStatus_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Failed","statusDescription":"Record not found."}`))
@@ -564,7 +564,7 @@ func TestCloudNSClient_UpdateRecord_Bad_FailedStatus(t *testing.T) {
 
 // --- EnsureRecord round-trip ---
 
-func TestCloudNSClient_EnsureRecord_Good_AlreadyCorrect(t *testing.T) {
+func TestCloudNS_CloudNSClient_EnsureRecord_AlreadyCorrect_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"www","record":"1.2.3.4","ttl":"3600","status":1}}`))
@@ -584,7 +584,7 @@ func TestCloudNSClient_EnsureRecord_Good_AlreadyCorrect(t *testing.T) {
 	assert.False(t, changed, "should not change when record already correct")
 }
 
-func TestCloudNSClient_EnsureRecord_Good_NeedsUpdate(t *testing.T) {
+func TestCloudNS_CloudNSClient_EnsureRecord_NeedsUpdate_Good(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
@@ -614,7 +614,7 @@ func TestCloudNSClient_EnsureRecord_Good_NeedsUpdate(t *testing.T) {
 	assert.True(t, changed, "should change when record needs update")
 }
 
-func TestCloudNSClient_EnsureRecord_Good_NeedsCreate(t *testing.T) {
+func TestCloudNS_CloudNSClient_EnsureRecord_NeedsCreate_Good(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
@@ -646,7 +646,7 @@ func TestCloudNSClient_EnsureRecord_Good_NeedsCreate(t *testing.T) {
 
 // --- ClearACMEChallenge round-trip ---
 
-func TestCloudNSClient_ClearACMEChallenge_Good_ViaDoRaw(t *testing.T) {
+func TestCloudNS_CloudNSClient_ClearACMEChallenge_ViaDoRaw_Good(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
@@ -679,7 +679,7 @@ func TestCloudNSClient_ClearACMEChallenge_Good_ViaDoRaw(t *testing.T) {
 	assert.GreaterOrEqual(t, callCount, 2, "should have called list + delete")
 }
 
-func TestCloudNSClient_DoRaw_Good_AuthQueryParams(t *testing.T) {
+func TestCloudNS_CloudNSClient_DoRaw_AuthQueryParams_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "49500", r.URL.Query().Get("auth-id"))
 		assert.Equal(t, "supersecret", r.URL.Query().Get("auth-password"))

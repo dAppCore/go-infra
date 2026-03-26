@@ -2,7 +2,6 @@ package prod
 
 import (
 	"context"
-	"os"
 	"sync"
 	"time"
 
@@ -314,9 +313,9 @@ func loadConfig() (*infra.Config, string, error) {
 		return cfg, infraFile, err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, "", err
+	cwd := core.Env("DIR_CWD")
+	if cwd == "" {
+		return nil, "", core.E("prod.loadConfig", "DIR_CWD unavailable", nil)
 	}
 
 	return infra.Discover(cwd)

@@ -8,6 +8,7 @@ import (
 )
 
 // Config is the top-level infrastructure configuration parsed from infra.yaml.
+// Usage: cfg := infra.Config{}
 type Config struct {
 	Hosts        map[string]*Host      `yaml:"hosts"`
 	LoadBalancer LoadBalancer          `yaml:"load_balancer"`
@@ -25,6 +26,7 @@ type Config struct {
 }
 
 // Host represents a server in the infrastructure.
+// Usage: host := infra.Host{}
 type Host struct {
 	FQDN      string   `yaml:"fqdn"`
 	IP        string   `yaml:"ip"`
@@ -36,6 +38,7 @@ type Host struct {
 }
 
 // SSHConf holds SSH connection details for a host.
+// Usage: ssh := infra.SSHConf{}
 type SSHConf struct {
 	User string `yaml:"user"`
 	Key  string `yaml:"key"`
@@ -43,6 +46,7 @@ type SSHConf struct {
 }
 
 // LoadBalancer represents a Hetzner managed load balancer.
+// Usage: lb := infra.LoadBalancer{}
 type LoadBalancer struct {
 	Name      string      `yaml:"name"`
 	FQDN      string      `yaml:"fqdn"`
@@ -57,12 +61,14 @@ type LoadBalancer struct {
 }
 
 // Backend is a load balancer backend target.
+// Usage: backend := infra.Backend{}
 type Backend struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
 // HealthCheck configures load balancer health checking.
+// Usage: check := infra.HealthCheck{}
 type HealthCheck struct {
 	Protocol string `yaml:"protocol"`
 	Path     string `yaml:"path"`
@@ -70,6 +76,7 @@ type HealthCheck struct {
 }
 
 // Listener maps a frontend port to a backend port.
+// Usage: listener := infra.Listener{}
 type Listener struct {
 	Frontend      int    `yaml:"frontend"`
 	Backend       int    `yaml:"backend"`
@@ -78,18 +85,21 @@ type Listener struct {
 }
 
 // LBCert holds the SSL certificate configuration for the load balancer.
+// Usage: cert := infra.LBCert{}
 type LBCert struct {
 	Certificate string   `yaml:"certificate"`
 	SAN         []string `yaml:"san"`
 }
 
 // Network describes the private network.
+// Usage: network := infra.Network{}
 type Network struct {
 	CIDR string `yaml:"cidr"`
 	Name string `yaml:"name"`
 }
 
 // DNS holds DNS provider configuration and zone records.
+// Usage: dns := infra.DNS{}
 type DNS struct {
 	Provider    string           `yaml:"provider"`
 	Nameservers []string         `yaml:"nameservers"`
@@ -97,11 +107,13 @@ type DNS struct {
 }
 
 // Zone is a DNS zone with its records.
+// Usage: zone := infra.Zone{}
 type Zone struct {
 	Records []DNSRecord `yaml:"records"`
 }
 
 // DNSRecord is a single DNS record.
+// Usage: record := infra.DNSRecord{}
 type DNSRecord struct {
 	Name  string `yaml:"name"`
 	Type  string `yaml:"type"`
@@ -110,11 +122,13 @@ type DNSRecord struct {
 }
 
 // SSL holds SSL certificate configuration.
+// Usage: ssl := infra.SSL{}
 type SSL struct {
 	Wildcard WildcardCert `yaml:"wildcard"`
 }
 
 // WildcardCert describes a wildcard SSL certificate.
+// Usage: cert := infra.WildcardCert{}
 type WildcardCert struct {
 	Domains     []string `yaml:"domains"`
 	Method      string   `yaml:"method"`
@@ -123,6 +137,7 @@ type WildcardCert struct {
 }
 
 // Database describes the database cluster.
+// Usage: db := infra.Database{}
 type Database struct {
 	Engine    string       `yaml:"engine"`
 	Version   string       `yaml:"version"`
@@ -133,12 +148,14 @@ type Database struct {
 }
 
 // DBNode is a database cluster node.
+// Usage: node := infra.DBNode{}
 type DBNode struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
 // BackupConfig describes automated backup settings.
+// Usage: backup := infra.BackupConfig{}
 type BackupConfig struct {
 	Schedule    string `yaml:"schedule"`
 	Destination string `yaml:"destination"`
@@ -147,6 +164,7 @@ type BackupConfig struct {
 }
 
 // Cache describes the cache/session cluster.
+// Usage: cache := infra.Cache{}
 type Cache struct {
 	Engine   string      `yaml:"engine"`
 	Version  string      `yaml:"version"`
@@ -155,12 +173,14 @@ type Cache struct {
 }
 
 // CacheNode is a cache cluster node.
+// Usage: node := infra.CacheNode{}
 type CacheNode struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
 // Container describes a container deployment.
+// Usage: container := infra.Container{}
 type Container struct {
 	Image     string   `yaml:"image"`
 	Port      int      `yaml:"port,omitempty"`
@@ -171,18 +191,21 @@ type Container struct {
 }
 
 // S3Config describes object storage.
+// Usage: s3 := infra.S3Config{}
 type S3Config struct {
 	Endpoint string               `yaml:"endpoint"`
 	Buckets  map[string]*S3Bucket `yaml:"buckets"`
 }
 
 // S3Bucket is an S3 bucket configuration.
+// Usage: bucket := infra.S3Bucket{}
 type S3Bucket struct {
 	Purpose string   `yaml:"purpose"`
 	Paths   []string `yaml:"paths"`
 }
 
 // CDN describes CDN configuration.
+// Usage: cdn := infra.CDN{}
 type CDN struct {
 	Provider string   `yaml:"provider"`
 	Origin   string   `yaml:"origin"`
@@ -190,6 +213,7 @@ type CDN struct {
 }
 
 // CICD describes CI/CD configuration.
+// Usage: cicd := infra.CICD{}
 type CICD struct {
 	Provider   string `yaml:"provider"`
 	URL        string `yaml:"url"`
@@ -199,24 +223,28 @@ type CICD struct {
 }
 
 // Monitoring describes monitoring configuration.
+// Usage: monitoring := infra.Monitoring{}
 type Monitoring struct {
 	HealthEndpoints []HealthEndpoint `yaml:"health_endpoints"`
 	Alerts          map[string]int   `yaml:"alerts"`
 }
 
 // HealthEndpoint is a URL to monitor.
+// Usage: endpoint := infra.HealthEndpoint{}
 type HealthEndpoint struct {
 	URL      string `yaml:"url"`
 	Interval int    `yaml:"interval"`
 }
 
 // Backups describes backup schedules.
+// Usage: backups := infra.Backups{}
 type Backups struct {
 	Daily  []BackupJob `yaml:"daily"`
 	Weekly []BackupJob `yaml:"weekly"`
 }
 
 // BackupJob is a scheduled backup task.
+// Usage: job := infra.BackupJob{}
 type BackupJob struct {
 	Name        string   `yaml:"name"`
 	Type        string   `yaml:"type"`
@@ -225,6 +253,7 @@ type BackupJob struct {
 }
 
 // Load reads and parses an infra.yaml file.
+// Usage: cfg, err := infra.Load("/srv/project/infra.yaml")
 func Load(path string) (*Config, error) {
 	read := localFS.Read(path)
 	if !read.OK {
@@ -250,6 +279,7 @@ func Load(path string) (*Config, error) {
 }
 
 // Discover searches for infra.yaml in the given directory and parent directories.
+// Usage: cfg, path, err := infra.Discover(".")
 func Discover(startDir string) (*Config, string, error) {
 	dir := startDir
 	for {
@@ -269,6 +299,7 @@ func Discover(startDir string) (*Config, string, error) {
 }
 
 // HostsByRole returns all hosts matching the given role.
+// Usage: apps := cfg.HostsByRole("app")
 func (c *Config) HostsByRole(role string) map[string]*Host {
 	result := make(map[string]*Host)
 	for name, h := range c.Hosts {
@@ -280,6 +311,7 @@ func (c *Config) HostsByRole(role string) map[string]*Host {
 }
 
 // AppServers returns hosts with role "app".
+// Usage: apps := cfg.AppServers()
 func (c *Config) AppServers() map[string]*Host {
 	return c.HostsByRole("app")
 }

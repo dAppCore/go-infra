@@ -1,12 +1,9 @@
 package prod
 
 import (
-	"os"
-	"os/exec"
-	"syscall"
-
 	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
+	"forge.lthn.ai/core/go-infra/internal/coreexec"
 )
 
 var sshCmd = &cli.Command{
@@ -41,7 +38,6 @@ func runSSH(cmd *cli.Command, args []string) error {
 	}
 
 	sshArgs := []string{
-		"ssh",
 		"-i", host.SSH.Key,
 		"-p", core.Sprintf("%d", host.SSH.Port),
 		"-o", "StrictHostKeyChecking=accept-new",
@@ -53,11 +49,9 @@ func runSSH(cmd *cli.Command, args []string) error {
 		host.SSH.User, host.FQDN,
 		cli.DimStyle.Render(host.IP))
 
-	sshPath, err := exec.LookPath("ssh")
-	if err != nil {
-		return core.E("prod.ssh", "ssh not found", err)
-	}
-
 	// Replace current process with SSH
-	return syscall.Exec(sshPath, sshArgs, os.Environ())
+	if err := coreexec.Exec("ssh", sshArgs...); err != nil {
+		return core.E("prod.ssh", "exec ssh", err)
+	}
+	return nil
 }

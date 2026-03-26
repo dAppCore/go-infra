@@ -1,18 +1,17 @@
 package infra
 
 import (
-	"os"
 	"testing"
 
 	core "dappco.re/go/core"
 )
 
-func TestLoad_Good(t *testing.T) {
+func TestConfig_Load_Good(t *testing.T) {
 	// Find infra.yaml relative to test
 	// Walk up from test dir to find it
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	dir := core.Env("DIR_CWD")
+	if dir == "" {
+		t.Fatal(core.E("TestLoad_Good", "DIR_CWD unavailable", nil))
 	}
 
 	cfg, path, err := Discover(dir)
@@ -60,18 +59,18 @@ func TestLoad_Good(t *testing.T) {
 	}
 }
 
-func TestLoad_Bad(t *testing.T) {
+func TestConfig_Load_Bad(t *testing.T) {
 	_, err := Load("/nonexistent/infra.yaml")
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}
 }
 
-func TestLoad_Ugly(t *testing.T) {
+func TestConfig_Load_Ugly(t *testing.T) {
 	// Invalid YAML
 	tmp := core.JoinPath(t.TempDir(), "infra.yaml")
 	if r := localFS.WriteMode(tmp, "{{invalid yaml", 0644); !r.OK {
-		t.Fatal(coreResultErr(r, "TestLoad_Ugly"))
+		t.Fatal(coreResultErr(r, "TestConfig_Load_Ugly"))
 	}
 
 	_, err := Load(tmp)
@@ -129,7 +128,7 @@ func TestConfig_AppServers_Good(t *testing.T) {
 	}
 }
 
-func TestExpandPath(t *testing.T) {
+func TestConfig_ExpandPath_Good(t *testing.T) {
 	home := core.Env("DIR_HOME")
 
 	tests := []struct {
