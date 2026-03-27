@@ -2,11 +2,10 @@ package prod
 
 import (
 	"context"
-	"os"
 	"time"
 
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	coreerr "forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -52,10 +51,10 @@ func init() {
 }
 
 func getDNSClient() (*infra.CloudNSClient, error) {
-	authID := os.Getenv("CLOUDNS_AUTH_ID")
-	authPass := os.Getenv("CLOUDNS_AUTH_PASSWORD")
+	authID := core.Env("CLOUDNS_AUTH_ID")
+	authPass := core.Env("CLOUDNS_AUTH_PASSWORD")
 	if authID == "" || authPass == "" {
-		return nil, coreerr.E("prod.getDNSClient", "CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required", nil)
+		return nil, core.E("prod.getDNSClient", "CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required", nil)
 	}
 	return infra.NewCloudNSClient(authID, authPass), nil
 }
@@ -76,7 +75,7 @@ func runDNSList(cmd *cli.Command, args []string) error {
 
 	records, err := dns.ListRecords(ctx, zone)
 	if err != nil {
-		return coreerr.E("prod.runDNSList", "list records", err)
+		return core.E("prod.runDNSList", "list records", err)
 	}
 
 	cli.Print("%s DNS records for %s\n\n", cli.BoldStyle.Render("▶"), cli.TitleStyle.Render(zone))
@@ -113,7 +112,7 @@ func runDNSSet(cmd *cli.Command, args []string) error {
 
 	changed, err := dns.EnsureRecord(ctx, dnsZone, host, recordType, value, dnsTTL)
 	if err != nil {
-		return coreerr.E("prod.runDNSSet", "set record", err)
+		return core.E("prod.runDNSSet", "set record", err)
 	}
 
 	if changed {

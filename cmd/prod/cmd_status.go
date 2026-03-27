@@ -2,15 +2,12 @@ package prod
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"forge.lthn.ai/core/go-ansible"
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	coreerr "forge.lthn.ai/core/go-log"
+	"forge.lthn.ai/core/go-ansible"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -85,11 +82,11 @@ func runStatus(cmd *cli.Command, args []string) error {
 	}
 
 	// Check LB if token available
-	if token := os.Getenv("HCLOUD_TOKEN"); token != "" {
-		fmt.Println()
+	if token := core.Env("HCLOUD_TOKEN"); token != "" {
+		core.Println()
 		checkLoadBalancer(ctx, token)
 	} else {
-		fmt.Println()
+		core.Println()
 		cli.Print("%s Load balancer: %s\n",
 			cli.DimStyle.Render("  ○"),
 			cli.DimStyle.Render("HCLOUD_TOKEN not set (skipped)"))
@@ -115,14 +112,14 @@ func checkHost(ctx context.Context, name string, host *infra.Host) hostStatus {
 
 	client, err := ansible.NewSSHClient(sshCfg)
 	if err != nil {
-		s.Error = coreerr.E("prod.checkHost", "create SSH client", err)
+		s.Error = core.E("prod.checkHost", "create SSH client", err)
 		return s
 	}
 	defer func() { _ = client.Close() }()
 
 	start := time.Now()
 	if err := client.Connect(ctx); err != nil {
-		s.Error = coreerr.E("prod.checkHost", "SSH connect", err)
+		s.Error = core.E("prod.checkHost", "SSH connect", err)
 		return s
 	}
 	s.Connected = true
@@ -130,12 +127,12 @@ func checkHost(ctx context.Context, name string, host *infra.Host) hostStatus {
 
 	// OS info
 	stdout, _, _, _ := client.Run(ctx, "cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'\"' -f2")
-	s.OS = strings.TrimSpace(stdout)
+	s.OS = core.Trim(stdout)
 
 	// Docker
 	stdout, _, _, err = client.Run(ctx, "docker --version 2>/dev/null | head -1")
 	if err == nil && stdout != "" {
-		s.Docker = strings.TrimSpace(stdout)
+		s.Docker = core.Trim(stdout)
 	}
 
 	// Check each expected service
@@ -151,14 +148,14 @@ func checkService(ctx context.Context, client *ansible.SSHClient, service string
 	switch service {
 	case "coolify":
 		stdout, _, _, _ := client.Run(ctx, "docker ps --format '{{.Names}}' 2>/dev/null | grep -c coolify")
-		if strings.TrimSpace(stdout) != "0" && strings.TrimSpace(stdout) != "" {
+		if core.Trim(stdout) != "0" && core.Trim(stdout) != "" {
 			return "running"
 		}
 		return "not running"
 
 	case "traefik":
 		stdout, _, _, _ := client.Run(ctx, "docker ps --format '{{.Names}}' 2>/dev/null | grep -c traefik")
-		if strings.TrimSpace(stdout) != "0" && strings.TrimSpace(stdout) != "" {
+		if core.Trim(stdout) != "0" && core.Trim(stdout) != "" {
 			return "running"
 		}
 		return "not running"
@@ -168,16 +165,16 @@ func checkService(ctx context.Context, client *ansible.SSHClient, service string
 		stdout, _, _, _ := client.Run(ctx,
 			"docker exec $(docker ps -q --filter name=mariadb 2>/dev/null || echo none) "+
 				"mariadb -u root -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\" --skip-column-names 2>/dev/null | awk '{print $2}'")
-		size := strings.TrimSpace(stdout)
+		size := core.Trim(stdout)
 		if size != "" && size != "0" {
-			return fmt.Sprintf("cluster_size=%s", size)
+			return core.Sprintf("cluster_size=%s", size)
 		}
 		// Try non-Docker
 		stdout, _, _, _ = client.Run(ctx,
 			"mariadb -u root -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\" --skip-column-names 2>/dev/null | awk '{print $2}'")
-		size = strings.TrimSpace(stdout)
+		size = core.Trim(stdout)
 		if size != "" && size != "0" {
-			return fmt.Sprintf("cluster_size=%s", size)
+			return core.Sprintf("cluster_size=%s", size)
 		}
 		return "not running"
 
@@ -185,18 +182,18 @@ func checkService(ctx context.Context, client *ansible.SSHClient, service string
 		stdout, _, _, _ := client.Run(ctx,
 			"docker exec $(docker ps -q --filter name=redis 2>/dev/null || echo none) "+
 				"redis-cli ping 2>/dev/null")
-		if strings.TrimSpace(stdout) == "PONG" {
+		if core.Trim(stdout) == "PONG" {
 			return "running"
 		}
 		stdout, _, _, _ = client.Run(ctx, "redis-cli ping 2>/dev/null")
-		if strings.TrimSpace(stdout) == "PONG" {
+		if core.Trim(stdout) == "PONG" {
 			return "running"
 		}
 		return "not running"
 
 	case "forgejo-runner":
 		stdout, _, _, _ := client.Run(ctx, "systemctl is-active forgejo-runner 2>/dev/null || docker ps --format '{{.Names}}' 2>/dev/null | grep -c runner")
-		val := strings.TrimSpace(stdout)
+		val := core.Trim(stdout)
 		if val == "active" || (val != "0" && val != "") {
 			return "running"
 		}
@@ -205,8 +202,8 @@ func checkService(ctx context.Context, client *ansible.SSHClient, service string
 	default:
 		// Generic docker container check
 		stdout, _, _, _ := client.Run(ctx,
-			fmt.Sprintf("docker ps --format '{{.Names}}' 2>/dev/null | grep -c %s", service))
-		if strings.TrimSpace(stdout) != "0" && strings.TrimSpace(stdout) != "" {
+			core.Sprintf("docker ps --format '{{.Names}}' 2>/dev/null | grep -c %s", service))
+		if core.Trim(stdout) != "0" && core.Trim(stdout) != "" {
 			return "running"
 		}
 		return "not running"
@@ -248,7 +245,7 @@ func printHostStatus(s hostStatus) {
 	if s.OS != "" {
 		cli.Print("  %s", cli.DimStyle.Render(s.OS))
 	}
-	fmt.Println()
+	core.Println()
 
 	if s.Docker != "" {
 		cli.Print("    %s %s\n", cli.SuccessStyle.Render("✓"), cli.DimStyle.Render(s.Docker))
@@ -271,7 +268,7 @@ func printHostStatus(s hostStatus) {
 		cli.Print("    %s %s %s\n", icon, svc, style.Render(status))
 	}
 
-	fmt.Println()
+	core.Println()
 }
 
 func checkLoadBalancer(ctx context.Context, token string) {
@@ -316,9 +313,9 @@ func loadConfig() (*infra.Config, string, error) {
 		return cfg, infraFile, err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, "", err
+	cwd := core.Env("DIR_CWD")
+	if cwd == "" {
+		return nil, "", core.E("prod.loadConfig", "DIR_CWD unavailable", nil)
 	}
 
 	return infra.Discover(cwd)

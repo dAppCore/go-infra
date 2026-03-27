@@ -9,6 +9,7 @@ var (
 )
 
 // Cmd is the root prod command.
+// Usage: root.AddCommand(prod.Cmd)
 var Cmd = &cli.Command{
 	Use:   "prod",
 	Short: "Production infrastructure management",

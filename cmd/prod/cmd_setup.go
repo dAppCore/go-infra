@@ -2,11 +2,10 @@ package prod
 
 import (
 	"context"
-	"os"
 	"time"
 
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	coreerr "forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -70,7 +69,7 @@ func runSetup(cmd *cli.Command, args []string) error {
 
 		if err := step.fn(ctx, cfg); err != nil {
 			cli.Print("  %s %s: %s\n", cli.ErrorStyle.Render("✗"), step.name, err)
-			return coreerr.E("prod.setup", "step "+step.name+" failed", err)
+			return core.E("prod.setup", core.Concat("step ", step.name, " failed"), err)
 		}
 
 		cli.Print("  %s %s complete\n", cli.SuccessStyle.Render("✓"), step.name)
@@ -82,14 +81,14 @@ func runSetup(cmd *cli.Command, args []string) error {
 
 func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 	// Discover HCloud servers
-	hcloudToken := os.Getenv("HCLOUD_TOKEN")
+	hcloudToken := core.Env("HCLOUD_TOKEN")
 	if hcloudToken != "" {
 		cli.Print("  Discovering Hetzner Cloud servers...\n")
 
 		hc := infra.NewHCloudClient(hcloudToken)
 		servers, err := hc.ListServers(ctx)
 		if err != nil {
-			return coreerr.E("prod.stepDiscover", "list HCloud servers", err)
+			return core.E("prod.stepDiscover", "list HCloud servers", err)
 		}
 
 		for _, s := range servers {
@@ -106,15 +105,15 @@ func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 	}
 
 	// Discover Robot servers
-	robotUser := os.Getenv("HETZNER_ROBOT_USER")
-	robotPass := os.Getenv("HETZNER_ROBOT_PASS")
+	robotUser := core.Env("HETZNER_ROBOT_USER")
+	robotPass := core.Env("HETZNER_ROBOT_PASS")
 	if robotUser != "" && robotPass != "" {
 		cli.Print("  Discovering Hetzner Robot servers...\n")
 
 		hr := infra.NewHRobotClient(robotUser, robotPass)
 		servers, err := hr.ListServers(ctx)
 		if err != nil {
-			return coreerr.E("prod.stepDiscover", "list Robot servers", err)
+			return core.E("prod.stepDiscover", "list Robot servers", err)
 		}
 
 		for _, s := range servers {
@@ -138,9 +137,9 @@ func stepDiscover(ctx context.Context, cfg *infra.Config) error {
 }
 
 func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
-	hcloudToken := os.Getenv("HCLOUD_TOKEN")
+	hcloudToken := core.Env("HCLOUD_TOKEN")
 	if hcloudToken == "" {
-		return coreerr.E("prod.stepLoadBalancer", "HCLOUD_TOKEN required for load balancer management", nil)
+		return core.E("prod.stepLoadBalancer", "HCLOUD_TOKEN required for load balancer management", nil)
 	}
 
 	hc := infra.NewHCloudClient(hcloudToken)
@@ -148,7 +147,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 	// Check if LB already exists
 	lbs, err := hc.ListLoadBalancers(ctx)
 	if err != nil {
-		return coreerr.E("prod.stepLoadBalancer", "list load balancers", err)
+		return core.E("prod.stepLoadBalancer", "list load balancers", err)
 	}
 
 	for _, lb := range lbs {
@@ -175,7 +174,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 	for _, b := range cfg.LoadBalancer.Backends {
 		host, ok := cfg.Hosts[b.Host]
 		if !ok {
-			return coreerr.E("prod.stepLoadBalancer", "backend host '"+b.Host+"' not found in config", nil)
+			return core.E("prod.stepLoadBalancer", core.Concat("backend host '", b.Host, "' not found in config"), nil)
 		}
 		targets = append(targets, infra.HCloudLBCreateTarget{
 			Type: "ip",
@@ -223,7 +222,7 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 
 	lb, err := hc.CreateLoadBalancer(ctx, req)
 	if err != nil {
-		return coreerr.E("prod.stepLoadBalancer", "create load balancer", err)
+		return core.E("prod.stepLoadBalancer", "create load balancer", err)
 	}
 
 	cli.Print("  Created: %s (ID: %d, IP: %s)\n",
@@ -233,10 +232,10 @@ func stepLoadBalancer(ctx context.Context, cfg *infra.Config) error {
 }
 
 func stepDNS(ctx context.Context, cfg *infra.Config) error {
-	authID := os.Getenv("CLOUDNS_AUTH_ID")
-	authPass := os.Getenv("CLOUDNS_AUTH_PASSWORD")
+	authID := core.Env("CLOUDNS_AUTH_ID")
+	authPass := core.Env("CLOUDNS_AUTH_PASSWORD")
 	if authID == "" || authPass == "" {
-		return coreerr.E("prod.stepDNS", "CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required", nil)
+		return core.E("prod.stepDNS", "CLOUDNS_AUTH_ID and CLOUDNS_AUTH_PASSWORD required", nil)
 	}
 
 	dns := infra.NewCloudNSClient(authID, authPass)

@@ -27,6 +27,7 @@ var (
 )
 
 // AddMonitorCommands registers the 'monitor' command.
+// Usage: monitor.AddMonitorCommands(root)
 func AddMonitorCommands(root *cli.Command) {
 	monitorCmd := &cli.Command{
 		Use:   "monitor",

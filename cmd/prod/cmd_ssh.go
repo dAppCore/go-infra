@@ -1,13 +1,9 @@
 package prod
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
-
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	coreerr "forge.lthn.ai/core/go-log"
+	"forge.lthn.ai/core/go-infra/internal/coreexec"
 )
 
 var sshCmd = &cli.Command{
@@ -38,15 +34,14 @@ func runSSH(cmd *cli.Command, args []string) error {
 		for n, h := range cfg.Hosts {
 			cli.Print("  %s  %s  (%s)\n", cli.BoldStyle.Render(n), h.IP, h.Role)
 		}
-		return coreerr.E("prod.ssh", "host '"+name+"' not found in infra.yaml", nil)
+		return core.E("prod.ssh", core.Concat("host '", name, "' not found in infra.yaml"), nil)
 	}
 
 	sshArgs := []string{
-		"ssh",
 		"-i", host.SSH.Key,
-		"-p", fmt.Sprintf("%d", host.SSH.Port),
+		"-p", core.Sprintf("%d", host.SSH.Port),
 		"-o", "StrictHostKeyChecking=accept-new",
-		fmt.Sprintf("%s@%s", host.SSH.User, host.IP),
+		core.Sprintf("%s@%s", host.SSH.User, host.IP),
 	}
 
 	cli.Print("%s %s@%s (%s)\n",
@@ -54,11 +49,9 @@ func runSSH(cmd *cli.Command, args []string) error {
 		host.SSH.User, host.FQDN,
 		cli.DimStyle.Render(host.IP))
 
-	sshPath, err := exec.LookPath("ssh")
-	if err != nil {
-		return coreerr.E("prod.ssh", "ssh not found", err)
-	}
-
 	// Replace current process with SSH
-	return syscall.Exec(sshPath, sshArgs, os.Environ())
+	if err := coreexec.Exec("ssh", sshArgs...); err != nil {
+		return core.E("prod.ssh", "exec ssh", err)
+	}
+	return nil
 }
