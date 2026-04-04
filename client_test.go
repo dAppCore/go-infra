@@ -14,7 +14,7 @@ import (
 
 // --- Constructor ---
 
-func TestNewAPIClient_Good_Defaults(t *testing.T) {
+func TestClient_NewAPIClient_Defaults_Good(t *testing.T) {
 	c := NewAPIClient()
 	assert.NotNil(t, c.client)
 	assert.Equal(t, "api", c.prefix)
@@ -24,7 +24,7 @@ func TestNewAPIClient_Good_Defaults(t *testing.T) {
 	assert.Nil(t, c.authFn)
 }
 
-func TestNewAPIClient_Good_WithOptions(t *testing.T) {
+func TestClient_NewAPIClient_WithOptions_Good(t *testing.T) {
 	custom := &http.Client{Timeout: 10 * time.Second}
 	authCalled := false
 
@@ -46,7 +46,7 @@ func TestNewAPIClient_Good_WithOptions(t *testing.T) {
 	assert.True(t, authCalled)
 }
 
-func TestDefaultRetryConfig_Good(t *testing.T) {
+func TestClient_DefaultRetryConfig_Good(t *testing.T) {
 	cfg := DefaultRetryConfig()
 	assert.Equal(t, 3, cfg.MaxRetries)
 	assert.Equal(t, 100*time.Millisecond, cfg.InitialBackoff)
@@ -55,7 +55,7 @@ func TestDefaultRetryConfig_Good(t *testing.T) {
 
 // --- Do method ---
 
-func TestAPIClient_Do_Good_Success(t *testing.T) {
+func TestClient_APIClient_Do_Success_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"name":"test"}`))
@@ -78,7 +78,7 @@ func TestAPIClient_Do_Good_Success(t *testing.T) {
 	assert.Equal(t, "test", result.Name)
 }
 
-func TestAPIClient_Do_Good_NilResult(t *testing.T) {
+func TestClient_APIClient_Do_NilResult_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -96,7 +96,7 @@ func TestAPIClient_Do_Good_NilResult(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAPIClient_Do_Good_AuthApplied(t *testing.T) {
+func TestClient_APIClient_Do_AuthApplied_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-token", r.Header.Get("Authorization"))
 		w.WriteHeader(http.StatusOK)
@@ -119,7 +119,7 @@ func TestAPIClient_Do_Good_AuthApplied(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAPIClient_Do_Bad_ClientError(t *testing.T) {
+func TestClient_APIClient_Do_ClientError_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`not found`))
@@ -141,7 +141,7 @@ func TestAPIClient_Do_Bad_ClientError(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestAPIClient_Do_Bad_DecodeError(t *testing.T) {
+func TestClient_APIClient_Do_DecodeError_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`not json`))
@@ -164,7 +164,7 @@ func TestAPIClient_Do_Bad_DecodeError(t *testing.T) {
 
 // --- Retry logic ---
 
-func TestAPIClient_Do_Good_RetriesServerError(t *testing.T) {
+func TestClient_APIClient_Do_RetriesServerError_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +201,7 @@ func TestAPIClient_Do_Good_RetriesServerError(t *testing.T) {
 	assert.Equal(t, int32(3), attempts.Load())
 }
 
-func TestAPIClient_Do_Bad_ExhaustsRetries(t *testing.T) {
+func TestClient_APIClient_Do_ExhaustsRetries_Bad(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +231,7 @@ func TestAPIClient_Do_Bad_ExhaustsRetries(t *testing.T) {
 	assert.Equal(t, int32(3), attempts.Load())
 }
 
-func TestAPIClient_Do_Good_NoRetryOn4xx(t *testing.T) {
+func TestClient_APIClient_Do_NoRetryOn4xx_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +259,7 @@ func TestAPIClient_Do_Good_NoRetryOn4xx(t *testing.T) {
 	assert.Equal(t, int32(1), attempts.Load())
 }
 
-func TestAPIClient_Do_Good_ZeroRetries(t *testing.T) {
+func TestClient_APIClient_Do_ZeroRetries_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +284,7 @@ func TestAPIClient_Do_Good_ZeroRetries(t *testing.T) {
 
 // --- Rate limiting ---
 
-func TestAPIClient_Do_Good_RateLimitRetry(t *testing.T) {
+func TestClient_APIClient_Do_RateLimitRetry_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -326,7 +326,7 @@ func TestAPIClient_Do_Good_RateLimitRetry(t *testing.T) {
 	assert.GreaterOrEqual(t, elapsed.Milliseconds(), int64(900))
 }
 
-func TestAPIClient_Do_Bad_RateLimitExhausted(t *testing.T) {
+func TestClient_APIClient_Do_RateLimitExhausted_Bad(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +355,7 @@ func TestAPIClient_Do_Bad_RateLimitExhausted(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load()) // 1 initial + 1 retry
 }
 
-func TestAPIClient_Do_Good_RateLimitNoRetryAfterHeader(t *testing.T) {
+func TestClient_APIClient_Do_RateLimitNoRetryAfterHeader_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -387,7 +387,7 @@ func TestAPIClient_Do_Good_RateLimitNoRetryAfterHeader(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load())
 }
 
-func TestAPIClient_Do_Ugly_ContextCancelled(t *testing.T) {
+func TestClient_APIClient_Do_ContextCancelled_Ugly(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`fail`))
@@ -415,7 +415,7 @@ func TestAPIClient_Do_Ugly_ContextCancelled(t *testing.T) {
 
 // --- DoRaw method ---
 
-func TestAPIClient_DoRaw_Good_Success(t *testing.T) {
+func TestClient_APIClient_DoRaw_Success_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`raw data here`))
 	}))
@@ -434,7 +434,7 @@ func TestAPIClient_DoRaw_Good_Success(t *testing.T) {
 	assert.Equal(t, "raw data here", string(data))
 }
 
-func TestAPIClient_DoRaw_Good_AuthApplied(t *testing.T) {
+func TestClient_APIClient_DoRaw_AuthApplied_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		assert.True(t, ok)
@@ -458,7 +458,7 @@ func TestAPIClient_DoRaw_Good_AuthApplied(t *testing.T) {
 	assert.Equal(t, "ok", string(data))
 }
 
-func TestAPIClient_DoRaw_Bad_ClientError(t *testing.T) {
+func TestClient_APIClient_DoRaw_ClientError_Bad(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`forbidden`))
@@ -479,7 +479,7 @@ func TestAPIClient_DoRaw_Bad_ClientError(t *testing.T) {
 	assert.Contains(t, err.Error(), "raw-test: HTTP 403")
 }
 
-func TestAPIClient_DoRaw_Good_RetriesServerError(t *testing.T) {
+func TestClient_APIClient_DoRaw_RetriesServerError_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -511,7 +511,7 @@ func TestAPIClient_DoRaw_Good_RetriesServerError(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load())
 }
 
-func TestAPIClient_DoRaw_Good_RateLimitRetry(t *testing.T) {
+func TestClient_APIClient_DoRaw_RateLimitRetry_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -544,7 +544,7 @@ func TestAPIClient_DoRaw_Good_RateLimitRetry(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load())
 }
 
-func TestAPIClient_DoRaw_Bad_NoRetryOn4xx(t *testing.T) {
+func TestClient_APIClient_DoRaw_NoRetryOn4xx_Bad(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -573,22 +573,22 @@ func TestAPIClient_DoRaw_Bad_NoRetryOn4xx(t *testing.T) {
 
 // --- parseRetryAfter ---
 
-func TestParseRetryAfter_Good_Seconds(t *testing.T) {
+func TestClient_ParseRetryAfter_Seconds_Good(t *testing.T) {
 	d := parseRetryAfter("5")
 	assert.Equal(t, 5*time.Second, d)
 }
 
-func TestParseRetryAfter_Good_EmptyDefault(t *testing.T) {
+func TestClient_ParseRetryAfter_EmptyDefault_Good(t *testing.T) {
 	d := parseRetryAfter("")
 	assert.Equal(t, 1*time.Second, d)
 }
 
-func TestParseRetryAfter_Bad_InvalidFallback(t *testing.T) {
+func TestClient_ParseRetryAfter_InvalidFallback_Bad(t *testing.T) {
 	d := parseRetryAfter("not-a-number")
 	assert.Equal(t, 1*time.Second, d)
 }
 
-func TestParseRetryAfter_Good_Zero(t *testing.T) {
+func TestClient_ParseRetryAfter_Zero_Good(t *testing.T) {
 	d := parseRetryAfter("0")
 	// 0 is not > 0, falls back to 1s
 	assert.Equal(t, 1*time.Second, d)
@@ -596,7 +596,7 @@ func TestParseRetryAfter_Good_Zero(t *testing.T) {
 
 // --- Integration: HCloudClient uses APIClient retry ---
 
-func TestHCloudClient_Good_RetriesOnServerError(t *testing.T) {
+func TestClient_HCloudClient_RetriesOnServerError_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -632,7 +632,7 @@ func TestHCloudClient_Good_RetriesOnServerError(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load())
 }
 
-func TestHCloudClient_Good_HandlesRateLimit(t *testing.T) {
+func TestClient_HCloudClient_HandlesRateLimit_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -671,7 +671,7 @@ func TestHCloudClient_Good_HandlesRateLimit(t *testing.T) {
 
 // --- Integration: CloudNS uses APIClient retry ---
 
-func TestCloudNSClient_Good_RetriesOnServerError(t *testing.T) {
+func TestClient_CloudNSClient_RetriesOnServerError_Good(t *testing.T) {
 	var attempts atomic.Int32
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -707,7 +707,7 @@ func TestCloudNSClient_Good_RetriesOnServerError(t *testing.T) {
 
 // --- Rate limit shared state ---
 
-func TestAPIClient_Good_RateLimitSharedState(t *testing.T) {
+func TestClient_APIClient_RateLimitSharedState_Good(t *testing.T) {
 	// Verify that the blockedUntil state is respected across requests
 	var attempts atomic.Int32
 

@@ -2,12 +2,10 @@ package prod
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"time"
 
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	coreerr "forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-infra"
 )
 
@@ -37,9 +35,9 @@ func init() {
 }
 
 func getHCloudClient() (*infra.HCloudClient, error) {
-	token := os.Getenv("HCLOUD_TOKEN")
+	token := core.Env("HCLOUD_TOKEN")
 	if token == "" {
-		return nil, coreerr.E("prod.getHCloudClient", "HCLOUD_TOKEN environment variable required", nil)
+		return nil, core.E("prod.getHCloudClient", "HCLOUD_TOKEN environment variable required", nil)
 	}
 	return infra.NewHCloudClient(token), nil
 }
@@ -55,7 +53,7 @@ func runLBStatus(cmd *cli.Command, args []string) error {
 
 	lbs, err := hc.ListLoadBalancers(ctx)
 	if err != nil {
-		return coreerr.E("prod.runLBStatus", "list load balancers", err)
+		return core.E("prod.runLBStatus", "list load balancers", err)
 	}
 
 	if len(lbs) == 0 {
@@ -94,7 +92,7 @@ func runLBStatus(cmd *cli.Command, args []string) error {
 				}
 			}
 		}
-		fmt.Println()
+		core.Println()
 	}
 
 	return nil

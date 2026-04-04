@@ -1,8 +1,6 @@
 package infra
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"math"
 	"math/rand/v2"
@@ -11,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	coreerr "forge.lthn.ai/core/go-log"
+	core "dappco.re/go/core"
 )
 
 // RetryConfig controls exponential backoff retry behaviour.
+// Usage: cfg := infra.RetryConfig{}
 type RetryConfig struct {
 	// MaxRetries is the maximum number of retry attempts (0 = no retries).
 	MaxRetries int
@@ -25,6 +24,7 @@ type RetryConfig struct {
 }
 
 // DefaultRetryConfig returns sensible defaults: 3 retries, 100ms initial, 5s max.
+// Usage: cfg := infra.DefaultRetryConfig()
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
 		MaxRetries:     3,
@@ -36,39 +36,46 @@ func DefaultRetryConfig() RetryConfig {
 // APIClient is a shared HTTP client with retry, rate-limit handling,
 // and configurable authentication. Provider-specific clients embed or
 // delegate to this struct.
+// Usage: client := infra.NewAPIClient()
 type APIClient struct {
-	client  *http.Client
-	retry   RetryConfig
-	authFn  func(req *http.Request)
-	prefix  string // error prefix, e.g. "hcloud API"
-	mu      sync.Mutex
+	client       *http.Client
+	retry        RetryConfig
+	authFn       func(req *http.Request)
+	prefix       string // error prefix, e.g. "hcloud API"
+	mu           sync.Mutex
 	blockedUntil time.Time // rate-limit window
 }
 
 // APIClientOption configures an APIClient.
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("api"))
 type APIClientOption func(*APIClient)
 
 // WithHTTPClient sets a custom http.Client.
+// Usage: client := infra.NewAPIClient(infra.WithHTTPClient(http.DefaultClient))
 func WithHTTPClient(c *http.Client) APIClientOption {
 	return func(a *APIClient) { a.client = c }
 }
 
 // WithRetry sets the retry configuration.
+// Usage: client := infra.NewAPIClient(infra.WithRetry(infra.DefaultRetryConfig()))
 func WithRetry(cfg RetryConfig) APIClientOption {
 	return func(a *APIClient) { a.retry = cfg }
 }
 
 // WithAuth sets the authentication function applied to every request.
+// Usage: client := infra.NewAPIClient(infra.WithAuth(func(req *http.Request) {}))
 func WithAuth(fn func(req *http.Request)) APIClientOption {
 	return func(a *APIClient) { a.authFn = fn }
 }
 
 // WithPrefix sets the error message prefix (e.g. "hcloud API").
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("hcloud API"))
 func WithPrefix(p string) APIClientOption {
 	return func(a *APIClient) { a.prefix = p }
 }
 
 // NewAPIClient creates a new APIClient with the given options.
+// Usage: client := infra.NewAPIClient(infra.WithPrefix("cloudns API"))
 func NewAPIClient(opts ...APIClientOption) *APIClient {
 	a := &APIClient{
 		client: &http.Client{Timeout: 30 * time.Second},
@@ -84,6 +91,7 @@ func NewAPIClient(opts ...APIClientOption) *APIClient {
 // Do executes an HTTP request with authentication, retry logic, and
 // rate-limit handling. If result is non-nil, the response body is
 // JSON-decoded into it.
+// Usage: err := client.Do(req, &result)
 func (a *APIClient) Do(req *http.Request, result any) error {
 	if a.authFn != nil {
 		a.authFn(req)
@@ -107,7 +115,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		resp, err := a.client.Do(req)
 		if err != nil {
-			lastErr = coreerr.E(a.prefix, "request failed", err)
+			lastErr = core.E(a.prefix, "request failed", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -117,7 +125,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 		data, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			lastErr = coreerr.E("client.Do", "read response", err)
+			lastErr = core.E("client.Do", "read response", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -131,7 +139,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 			a.blockedUntil = time.Now().Add(retryAfter)
 			a.mu.Unlock()
 
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
+			lastErr = core.E(a.prefix, core.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
 			if attempt < attempts-1 {
 				select {
 				case <-req.Context().Done():
@@ -144,7 +152,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Server errors are retryable.
 		if resp.StatusCode >= 500 {
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			lastErr = core.E(a.prefix, core.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -153,13 +161,13 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 		// Client errors (4xx, except 429 handled above) are not retried.
 		if resp.StatusCode >= 400 {
-			return coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			return core.E(a.prefix, core.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 		}
 
 		// Success — decode if requested.
 		if result != nil {
-			if err := json.Unmarshal(data, result); err != nil {
-				return coreerr.E("client.Do", "decode response", err)
+			if r := core.JSONUnmarshal(data, result); !r.OK {
+				return core.E("client.Do", "decode response", coreResultErr(r, "client.Do"))
 			}
 		}
 		return nil
@@ -170,6 +178,7 @@ func (a *APIClient) Do(req *http.Request, result any) error {
 
 // DoRaw executes a request and returns the raw response body.
 // Same retry/rate-limit logic as Do but without JSON decoding.
+// Usage: body, err := client.DoRaw(req)
 func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 	if a.authFn != nil {
 		a.authFn(req)
@@ -193,7 +202,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 
 		resp, err := a.client.Do(req)
 		if err != nil {
-			lastErr = coreerr.E(a.prefix, "request failed", err)
+			lastErr = core.E(a.prefix, "request failed", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -203,7 +212,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		data, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			lastErr = coreerr.E("client.DoRaw", "read response", err)
+			lastErr = core.E("client.DoRaw", "read response", err)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -216,7 +225,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 			a.blockedUntil = time.Now().Add(retryAfter)
 			a.mu.Unlock()
 
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
+			lastErr = core.E(a.prefix, core.Sprintf("rate limited: HTTP %d", resp.StatusCode), nil)
 			if attempt < attempts-1 {
 				select {
 				case <-req.Context().Done():
@@ -228,7 +237,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 500 {
-			lastErr = coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			lastErr = core.E(a.prefix, core.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 			if attempt < attempts-1 {
 				a.backoff(attempt, req)
 			}
@@ -236,7 +245,7 @@ func (a *APIClient) DoRaw(req *http.Request) ([]byte, error) {
 		}
 
 		if resp.StatusCode >= 400 {
-			return nil, coreerr.E(a.prefix, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(data)), nil)
+			return nil, core.E(a.prefix, core.Sprintf("HTTP %d: %s", resp.StatusCode, truncateBody(data, maxErrBodyLen)), nil)
 		}
 
 		return data, nil
@@ -259,6 +268,17 @@ func (a *APIClient) backoff(attempt int, req *http.Request) {
 	case <-req.Context().Done():
 	case <-time.After(d):
 	}
+}
+
+// maxErrBodyLen is the maximum number of bytes from a response body included in error messages.
+const maxErrBodyLen = 256
+
+// truncateBody limits response body length in error messages to prevent sensitive data leakage.
+func truncateBody(data []byte, max int) string {
+	if len(data) <= max {
+		return string(data)
+	}
+	return string(data[:max]) + "...(truncated)"
 }
 
 // parseRetryAfter interprets the Retry-After header value.

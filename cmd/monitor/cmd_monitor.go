@@ -11,17 +11,15 @@ package monitor
 
 import (
 	"cmp"
-	"encoding/json"
-	"fmt"
+	"context"
 	"maps"
-	"os/exec"
 	"slices"
-	"strings"
 
+	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
 	"forge.lthn.ai/core/go-i18n"
+	"forge.lthn.ai/core/go-infra/internal/coreexec"
 	"forge.lthn.ai/core/go-io"
-	"forge.lthn.ai/core/go-log"
 	"forge.lthn.ai/core/go-scm/repos"
 )
 
@@ -33,7 +31,8 @@ var (
 	monitorAll      bool
 )
 
-// Finding represents a security finding from any source
+// Finding represents a security finding from any source.
+// Usage: finding := monitor.Finding{}
 type Finding struct {
 	Source    string   `json:"source"`     // semgrep, trivy, dependabot, secret-scanning, etc.
 	Severity  string   `json:"severity"`   // critical, high, medium, low
@@ -48,7 +47,8 @@ type Finding struct {
 	Labels    []string `json:"suggested_labels,omitempty"`
 }
 
-// CodeScanningAlert represents a GitHub code scanning alert
+// CodeScanningAlert represents a GitHub code scanning alert.
+// Usage: alert := monitor.CodeScanningAlert{}
 type CodeScanningAlert struct {
 	Number int    `json:"number"`
 	State  string `json:"state"` // open, dismissed, fixed
@@ -73,7 +73,8 @@ type CodeScanningAlert struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// DependabotAlert represents a GitHub Dependabot alert
+// DependabotAlert represents a GitHub Dependabot alert.
+// Usage: alert := monitor.DependabotAlert{}
 type DependabotAlert struct {
 	Number                int    `json:"number"`
 	State                 string `json:"state"` // open, dismissed, fixed
@@ -96,7 +97,8 @@ type DependabotAlert struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// SecretScanningAlert represents a GitHub secret scanning alert
+// SecretScanningAlert represents a GitHub secret scanning alert.
+// Usage: alert := monitor.SecretScanningAlert{}
 type SecretScanningAlert struct {
 	Number       int    `json:"number"`
 	State        string `json:"state"` // open, resolved
@@ -109,8 +111,8 @@ type SecretScanningAlert struct {
 
 func runMonitor() error {
 	// Check gh is available
-	if _, err := exec.LookPath("gh"); err != nil {
-		return log.E("monitor", i18n.T("error.gh_not_found"), err)
+	if _, err := coreexec.LookPath("gh"); err != nil {
+		return core.E("monitor", i18n.T("error.gh_not_found"), err)
 	}
 
 	// Determine repos to scan
@@ -120,7 +122,7 @@ func runMonitor() error {
 	}
 
 	if len(repoList) == 0 {
-		return log.E("monitor", i18n.T("cmd.monitor.error.no_repos"), nil)
+		return core.E("monitor", i18n.T("cmd.monitor.error.no_repos"), nil)
 	}
 
 	// Collect all findings and errors
@@ -166,7 +168,7 @@ func runMonitor() error {
 func resolveRepos() ([]string, error) {
 	if monitorRepo != "" {
 		// Specific repo - if fully qualified (org/repo), use as-is
-		if strings.Contains(monitorRepo, "/") {
+		if core.Contains(monitorRepo, "/") {
 			return []string{monitorRepo}, nil
 		}
 		// Otherwise, try to detect org from git remote, fallback to host-uk
@@ -182,12 +184,12 @@ func resolveRepos() ([]string, error) {
 		// All repos from registry
 		registry, err := repos.FindRegistry(io.Local)
 		if err != nil {
-			return nil, log.E("monitor", "failed to find registry", err)
+			return nil, core.E("monitor", "failed to find registry", err)
 		}
 
 		loaded, err := repos.LoadRegistry(io.Local, registry)
 		if err != nil {
-			return nil, log.E("monitor", "failed to load registry", err)
+			return nil, core.E("monitor", "failed to load registry", err)
 		}
 
 		var repoList []string
@@ -210,26 +212,26 @@ func resolveRepos() ([]string, error) {
 func fetchRepoFindings(repoFullName string) ([]Finding, []string) {
 	var findings []Finding
 	var errs []string
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 
 	// Fetch code scanning alerts
 	codeFindings, err := fetchCodeScanningAlerts(repoFullName)
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("%s: code-scanning: %s", repoName, err))
+		errs = append(errs, core.Sprintf("%s: code-scanning: %s", repoName, err))
 	}
 	findings = append(findings, codeFindings...)
 
 	// Fetch Dependabot alerts
 	depFindings, err := fetchDependabotAlerts(repoFullName)
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("%s: dependabot: %s", repoName, err))
+		errs = append(errs, core.Sprintf("%s: dependabot: %s", repoName, err))
 	}
 	findings = append(findings, depFindings...)
 
 	// Fetch secret scanning alerts
 	secretFindings, err := fetchSecretScanningAlerts(repoFullName)
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("%s: secret-scanning: %s", repoName, err))
+		errs = append(errs, core.Sprintf("%s: secret-scanning: %s", repoName, err))
 	}
 	findings = append(findings, secretFindings...)
 
@@ -238,33 +240,32 @@ func fetchRepoFindings(repoFullName string) ([]Finding, []string) {
 
 // fetchCodeScanningAlerts fetches code scanning alerts
 func fetchCodeScanningAlerts(repoFullName string) ([]Finding, error) {
-	args := []string{
+	output, err := coreexec.Run(
+		context.Background(),
+		"gh",
 		"api",
-		fmt.Sprintf("repos/%s/code-scanning/alerts", repoFullName),
+		core.Sprintf("repos/%s/code-scanning/alerts", repoFullName),
+	)
+	if err != nil {
+		return nil, core.E("monitor.fetchCodeScanning", "API request failed", err)
 	}
 
-	cmd := exec.Command("gh", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		// Check for expected "not enabled" responses vs actual errors
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			stderr := string(exitErr.Stderr)
-			// These are expected conditions, not errors
-			if strings.Contains(stderr, "Advanced Security must be enabled") ||
-				strings.Contains(stderr, "no analysis found") ||
-				strings.Contains(stderr, "Not Found") {
-				return nil, nil
-			}
+	if output.ExitCode != 0 {
+		// These are expected conditions, not errors.
+		if core.Contains(output.Stderr, "Advanced Security must be enabled") ||
+			core.Contains(output.Stderr, "no analysis found") ||
+			core.Contains(output.Stderr, "Not Found") {
+			return nil, nil
 		}
-		return nil, log.E("monitor.fetchCodeScanning", "API request failed", err)
+		return nil, commandExitErr("monitor.fetchCodeScanning", output)
 	}
 
 	var alerts []CodeScanningAlert
-	if err := json.Unmarshal(output, &alerts); err != nil {
-		return nil, log.E("monitor.fetchCodeScanning", "failed to parse response", err)
+	if r := core.JSONUnmarshal([]byte(output.Stdout), &alerts); !r.OK {
+		return nil, core.E("monitor.fetchCodeScanning", "failed to parse response", monitorResultErr(r, "monitor.fetchCodeScanning"))
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -294,31 +295,31 @@ func fetchCodeScanningAlerts(repoFullName string) ([]Finding, error) {
 
 // fetchDependabotAlerts fetches Dependabot alerts
 func fetchDependabotAlerts(repoFullName string) ([]Finding, error) {
-	args := []string{
+	output, err := coreexec.Run(
+		context.Background(),
+		"gh",
 		"api",
-		fmt.Sprintf("repos/%s/dependabot/alerts", repoFullName),
+		core.Sprintf("repos/%s/dependabot/alerts", repoFullName),
+	)
+	if err != nil {
+		return nil, core.E("monitor.fetchDependabot", "API request failed", err)
 	}
 
-	cmd := exec.Command("gh", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			stderr := string(exitErr.Stderr)
-			// Dependabot not enabled is expected
-			if strings.Contains(stderr, "Dependabot alerts are not enabled") ||
-				strings.Contains(stderr, "Not Found") {
-				return nil, nil
-			}
+	if output.ExitCode != 0 {
+		// Dependabot not enabled is expected.
+		if core.Contains(output.Stderr, "Dependabot alerts are not enabled") ||
+			core.Contains(output.Stderr, "Not Found") {
+			return nil, nil
 		}
-		return nil, log.E("monitor.fetchDependabot", "API request failed", err)
+		return nil, commandExitErr("monitor.fetchDependabot", output)
 	}
 
 	var alerts []DependabotAlert
-	if err := json.Unmarshal(output, &alerts); err != nil {
-		return nil, log.E("monitor.fetchDependabot", "failed to parse response", err)
+	if r := core.JSONUnmarshal([]byte(output.Stdout), &alerts); !r.OK {
+		return nil, core.E("monitor.fetchDependabot", "failed to parse response", monitorResultErr(r, "monitor.fetchDependabot"))
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -330,7 +331,7 @@ func fetchDependabotAlerts(repoFullName string) ([]Finding, error) {
 			Rule:      alert.SecurityAdvisory.CVEID,
 			File:      alert.Dependency.ManifestPath,
 			Line:      0,
-			Message:   fmt.Sprintf("%s: %s", alert.SecurityVulnerability.Package.Name, alert.SecurityAdvisory.Summary),
+			Message:   core.Sprintf("%s: %s", alert.SecurityVulnerability.Package.Name, alert.SecurityAdvisory.Summary),
 			URL:       alert.HTMLURL,
 			State:     alert.State,
 			RepoName:  repoName,
@@ -345,31 +346,31 @@ func fetchDependabotAlerts(repoFullName string) ([]Finding, error) {
 
 // fetchSecretScanningAlerts fetches secret scanning alerts
 func fetchSecretScanningAlerts(repoFullName string) ([]Finding, error) {
-	args := []string{
+	output, err := coreexec.Run(
+		context.Background(),
+		"gh",
 		"api",
-		fmt.Sprintf("repos/%s/secret-scanning/alerts", repoFullName),
+		core.Sprintf("repos/%s/secret-scanning/alerts", repoFullName),
+	)
+	if err != nil {
+		return nil, core.E("monitor.fetchSecretScanning", "API request failed", err)
 	}
 
-	cmd := exec.Command("gh", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			stderr := string(exitErr.Stderr)
-			// Secret scanning not enabled is expected
-			if strings.Contains(stderr, "Secret scanning is disabled") ||
-				strings.Contains(stderr, "Not Found") {
-				return nil, nil
-			}
+	if output.ExitCode != 0 {
+		// Secret scanning not enabled is expected.
+		if core.Contains(output.Stderr, "Secret scanning is disabled") ||
+			core.Contains(output.Stderr, "Not Found") {
+			return nil, nil
 		}
-		return nil, log.E("monitor.fetchSecretScanning", "API request failed", err)
+		return nil, commandExitErr("monitor.fetchSecretScanning", output)
 	}
 
 	var alerts []SecretScanningAlert
-	if err := json.Unmarshal(output, &alerts); err != nil {
-		return nil, log.E("monitor.fetchSecretScanning", "failed to parse response", err)
+	if r := core.JSONUnmarshal([]byte(output.Stdout), &alerts); !r.OK {
+		return nil, core.E("monitor.fetchSecretScanning", "failed to parse response", monitorResultErr(r, "monitor.fetchSecretScanning"))
 	}
 
-	repoName := strings.Split(repoFullName, "/")[1]
+	repoName := repoShortName(repoFullName)
 	var findings []Finding
 	for _, alert := range alerts {
 		if alert.State != "open" {
@@ -381,7 +382,7 @@ func fetchSecretScanningAlerts(repoFullName string) ([]Finding, error) {
 			Rule:      alert.SecretType,
 			File:      alert.LocationType,
 			Line:      0,
-			Message:   fmt.Sprintf("Exposed %s detected", alert.SecretType),
+			Message:   core.Sprintf("Exposed %s detected", alert.SecretType),
 			URL:       alert.HTMLURL,
 			State:     alert.State,
 			RepoName:  repoName,
@@ -396,7 +397,7 @@ func fetchSecretScanningAlerts(repoFullName string) ([]Finding, error) {
 
 // normalizeSeverity normalizes severity strings to standard values
 func normalizeSeverity(s string) string {
-	s = strings.ToLower(s)
+	s = core.Lower(s)
 	switch s {
 	case "critical", "crit":
 		return "critical"
@@ -415,7 +416,7 @@ func normalizeSeverity(s string) string {
 func filterBySeverity(findings []Finding, severities []string) []Finding {
 	sevSet := make(map[string]bool)
 	for _, s := range severities {
-		sevSet[strings.ToLower(s)] = true
+		sevSet[core.Lower(s)] = true
 	}
 
 	var filtered []Finding
@@ -446,11 +447,11 @@ func sortBySeverity(findings []Finding) {
 
 // outputJSON outputs findings as JSON
 func outputJSON(findings []Finding) error {
-	data, err := json.MarshalIndent(findings, "", "  ")
-	if err != nil {
-		return log.E("monitor", "failed to marshal findings", err)
+	r := core.JSONMarshal(findings)
+	if !r.OK {
+		return core.E("monitor", "failed to marshal findings", monitorResultErr(r, "monitor"))
 	}
-	cli.Print("%s\n", string(data))
+	cli.Print("%s\n", string(r.Value.([]byte)))
 	return nil
 }
 
@@ -470,18 +471,18 @@ func outputTable(findings []Finding) error {
 	// Header summary
 	var parts []string
 	if counts["critical"] > 0 {
-		parts = append(parts, errorStyle.Render(fmt.Sprintf("%d critical", counts["critical"])))
+		parts = append(parts, errorStyle.Render(core.Sprintf("%d critical", counts["critical"])))
 	}
 	if counts["high"] > 0 {
-		parts = append(parts, errorStyle.Render(fmt.Sprintf("%d high", counts["high"])))
+		parts = append(parts, errorStyle.Render(core.Sprintf("%d high", counts["high"])))
 	}
 	if counts["medium"] > 0 {
-		parts = append(parts, warningStyle.Render(fmt.Sprintf("%d medium", counts["medium"])))
+		parts = append(parts, warningStyle.Render(core.Sprintf("%d medium", counts["medium"])))
 	}
 	if counts["low"] > 0 {
-		parts = append(parts, dimStyle.Render(fmt.Sprintf("%d low", counts["low"])))
+		parts = append(parts, dimStyle.Render(core.Sprintf("%d low", counts["low"])))
 	}
-	cli.Print("%s: %s\n", i18n.T("cmd.monitor.found"), strings.Join(parts, ", "))
+	cli.Print("%s: %s\n", i18n.T("cmd.monitor.found"), core.Join(", ", parts...))
 	cli.Blank()
 
 	// Group by repo
@@ -511,12 +512,12 @@ func outputTable(findings []Finding) error {
 			if f.File != "" {
 				location = f.File
 				if f.Line > 0 {
-					location = fmt.Sprintf("%s:%d", f.File, f.Line)
+					location = core.Sprintf("%s:%d", f.File, f.Line)
 				}
 			}
 
 			cli.Print("  %s %s: %s",
-				sevStyle.Render(fmt.Sprintf("[%s]", f.Severity)),
+				sevStyle.Render(core.Sprintf("[%s]", f.Severity)),
 				dimStyle.Render(f.Source),
 				truncate(f.Message, 60))
 			if location != "" {
@@ -530,6 +531,16 @@ func outputTable(findings []Finding) error {
 	return nil
 }
 
+// repoShortName extracts the repo name from "org/repo" format.
+// Returns the full string if no "/" is present.
+func repoShortName(fullName string) string {
+	parts := core.Split(fullName, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return fullName
+}
+
 // truncate truncates a string to max runes (Unicode-safe)
 func truncate(s string, max int) string {
 	runes := []rune(s)
@@ -541,13 +552,15 @@ func truncate(s string, max int) string {
 
 // detectRepoFromGit detects the repo from git remote
 func detectRepoFromGit() (string, error) {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	output, err := cmd.Output()
+	output, err := coreexec.Run(context.Background(), "git", "remote", "get-url", "origin")
 	if err != nil {
-		return "", log.E("monitor", i18n.T("cmd.monitor.error.not_git_repo"), err)
+		return "", core.E("monitor", i18n.T("cmd.monitor.error.not_git_repo"), err)
+	}
+	if output.ExitCode != 0 {
+		return "", core.E("monitor", i18n.T("cmd.monitor.error.not_git_repo"), commandExitErr("monitor.detectRepoFromGit", output))
 	}
 
-	url := strings.TrimSpace(string(output))
+	url := core.Trim(output.Stdout)
 	return parseGitHubRepo(url)
 }
 
@@ -557,7 +570,7 @@ func detectOrgFromGit() string {
 	if err != nil {
 		return ""
 	}
-	parts := strings.Split(repo, "/")
+	parts := core.Split(repo, "/")
 	if len(parts) >= 1 {
 		return parts[0]
 	}
@@ -567,20 +580,41 @@ func detectOrgFromGit() string {
 // parseGitHubRepo extracts org/repo from a git URL
 func parseGitHubRepo(url string) (string, error) {
 	// Handle SSH URLs: git@github.com:org/repo.git
-	if strings.HasPrefix(url, "git@github.com:") {
-		path := strings.TrimPrefix(url, "git@github.com:")
-		path = strings.TrimSuffix(path, ".git")
+	if core.HasPrefix(url, "git@github.com:") {
+		path := core.TrimPrefix(url, "git@github.com:")
+		path = core.TrimSuffix(path, ".git")
 		return path, nil
 	}
 
 	// Handle HTTPS URLs: https://github.com/org/repo.git
-	if strings.Contains(url, "github.com/") {
-		parts := strings.Split(url, "github.com/")
+	if core.Contains(url, "github.com/") {
+		parts := core.Split(url, "github.com/")
 		if len(parts) >= 2 {
-			path := strings.TrimSuffix(parts[1], ".git")
+			path := core.TrimSuffix(parts[1], ".git")
 			return path, nil
 		}
 	}
 
-	return "", log.E("monitor.parseGitHubRepo", "could not parse GitHub repo from URL: "+url, nil)
+	return "", core.E("monitor.parseGitHubRepo", core.Concat("could not parse GitHub repo from URL: ", url), nil)
+}
+
+func monitorResultErr(r core.Result, op string) error {
+	if r.OK {
+		return nil
+	}
+	if err, ok := r.Value.(error); ok && err != nil {
+		return err
+	}
+	if r.Value == nil {
+		return core.E(op, "unexpected empty core result", nil)
+	}
+	return core.E(op, core.Sprint(r.Value), nil)
+}
+
+func commandExitErr(op string, result coreexec.Result) error {
+	msg := core.Trim(result.Stderr)
+	if msg == "" {
+		msg = core.Sprintf("command exited with status %d", result.ExitCode)
+	}
+	return core.E(op, msg, nil)
 }
