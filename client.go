@@ -1,13 +1,13 @@
 package infra
 
 import (
-	"io"
-	"math"
-	"math/rand/v2"
-	"net/http"
-	"strconv"
-	"sync"
-	"time"
+	"io"             // Note: intrinsic — io.ReadAll for HTTP response body; go-io Medium does not model outbound HTTP responses.
+	"math"           // Note: intrinsic — math.Pow for exponential backoff calculation; no core equivalent for float math primitives.
+	"math/rand/v2"   // Note: intrinsic — math/rand/v2 for jitter in retry backoff; no core equivalent for cryptographically-weak fast random.
+	"net/http"       // Note: intrinsic — net/http for outbound API calls to Hetzner Cloud, Hetzner Robot, CloudNS; c.Process() models subprocesses not HTTP clients.
+	"strconv"        // Note: intrinsic — strconv.Atoi for Retry-After header parsing; no core equivalent for string-to-int.
+	"sync"           // Note: intrinsic — sync.Mutex for rate-limit state (blockedUntil timer); no core equivalent.
+	"time"           // Note: intrinsic — time.Duration/After/Now for retry backoff and rate-limit Retry-After enforcement; no core equivalent.
 
 	core "dappco.re/go/core"
 )
