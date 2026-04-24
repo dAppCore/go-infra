@@ -3,7 +3,7 @@ package prod
 import (
 	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	"forge.lthn.ai/core/go-infra/internal/coreexec"
+	"dappco.re/go/core/infra/internal/coreexec"
 )
 
 var sshCmd = &cli.Command{

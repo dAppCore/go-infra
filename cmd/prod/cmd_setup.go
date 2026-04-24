@@ -6,7 +6,7 @@ import (
 
 	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
-	"forge.lthn.ai/core/go-infra"
+	"dappco.re/go/core/infra"
 )
 
 var setupCmd = &cli.Command{

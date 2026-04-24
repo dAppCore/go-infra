@@ -18,7 +18,7 @@ import (
 	core "dappco.re/go/core"
 	"forge.lthn.ai/core/cli/pkg/cli"
 	"forge.lthn.ai/core/go-i18n"
-	"forge.lthn.ai/core/go-infra/internal/coreexec"
+	"dappco.re/go/core/infra/internal/coreexec"
 	"forge.lthn.ai/core/go-io"
 	"forge.lthn.ai/core/go-scm/repos"
 )
