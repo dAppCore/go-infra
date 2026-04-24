@@ -4,18 +4,18 @@ go 1.26.0
 
 require (
 	dappco.re/go/core v0.8.0-alpha.1
-	dappco.re/go/cli v0.3.5
-	dappco.re/go/ansible v0.1.4
-	dappco.re/go/i18n v0.1.5
-	dappco.re/go/io v0.1.5
-	dappco.re/go/scm v0.3.4
+	dappco.re/go/cli v0.8.0-alpha.1
+	dappco.re/go/ansible v0.8.0-alpha.1
+	dappco.re/go/i18n v0.8.0-alpha.1
+	dappco.re/go/io v0.8.0-alpha.1
+	dappco.re/go/scm v0.8.0-alpha.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	dappco.re/go/go v0.3.1 // indirect
-	dappco.re/go/inference v0.1.4 // indirect
-	dappco.re/go/log v0.0.4 // indirect
+	dappco.re/go/go v0.8.0-alpha.1 // indirect
+	dappco.re/go/inference v0.8.0-alpha.1 // indirect
+	dappco.re/go/log v0.8.0-alpha.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/bubbletea v1.3.10 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
