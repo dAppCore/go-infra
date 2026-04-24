@@ -4,6 +4,7 @@ package infra
 
 import (
 	core "dappco.re/go/core"
+	// Note: gopkg.in/yaml.v3 — yaml.Decoder/Unmarshal for infra.yaml parsing; no core equivalent (core.JSONMarshal is JSON-only).
 	"gopkg.in/yaml.v3"
 )
 
