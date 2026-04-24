@@ -16,11 +16,11 @@ import (
 	"slices"
 
 	core "dappco.re/go/core"
-	"forge.lthn.ai/core/cli/pkg/cli"
-	"forge.lthn.ai/core/go-i18n"
-	"dappco.re/go/core/infra/internal/coreexec"
-	"forge.lthn.ai/core/go-io"
-	"forge.lthn.ai/core/go-scm/repos"
+	"dappco.re/go/cli/pkg/cli"
+	"dappco.re/go/i18n"
+	"dappco.re/go/infra/internal/coreexec"
+	"dappco.re/go/io"
+	"dappco.re/go/scm/repos"
 )
 
 // Command flags

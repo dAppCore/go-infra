@@ -1,7 +1,7 @@
 package prod
 
 import (
-	"forge.lthn.ai/core/cli/pkg/cli"
+	"dappco.re/go/cli/pkg/cli"
 )
 
 func init() {

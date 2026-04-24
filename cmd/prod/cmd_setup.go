@@ -5,8 +5,8 @@ import (
 	"time"
 
 	core "dappco.re/go/core"
-	"forge.lthn.ai/core/cli/pkg/cli"
-	"dappco.re/go/core/infra"
+	"dappco.re/go/cli/pkg/cli"
+	"dappco.re/go/infra"
 )
 
 var setupCmd = &cli.Command{

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	core "dappco.re/go/core"
-	"forge.lthn.ai/core/cli/pkg/cli"
-	"forge.lthn.ai/core/go-ansible"
-	"dappco.re/go/core/infra"
+	"dappco.re/go/cli/pkg/cli"
+	"dappco.re/go/ansible"
+	"dappco.re/go/infra"
 )
 
 var statusCmd = &cli.Command{
