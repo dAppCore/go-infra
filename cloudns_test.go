@@ -4,21 +4,29 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
 	"testing"
 
 	core "dappco.re/go/core"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // --- Constructor ---
 
 func TestCloudNS_NewCloudNSClient_Good(t *testing.T) {
 	c := NewCloudNSClient("12345", "secret")
-	assert.NotNil(t, c)
-	assert.Equal(t, "12345", c.authID)
-	assert.Equal(t, "secret", c.password)
-	assert.NotNil(t, c.api)
+	if c == nil {
+		t.Fatal("expected non-nil")
+	}
+	if "12345" != c.authID {
+		t.Fatalf("want %v, got %v", "12345", c.authID)
+	}
+	if "secret" != c.password {
+		t.Fatalf("want %v, got %v", "secret", c.password)
+	}
+	if c.api == nil {
+		t.Fatal("expected non-nil")
+	}
 }
 
 // --- authParams ---
@@ -26,9 +34,12 @@ func TestCloudNS_NewCloudNSClient_Good(t *testing.T) {
 func TestCloudNS_CloudNSClient_AuthParams_Good(t *testing.T) {
 	c := NewCloudNSClient("49500", "hunter2")
 	params := c.authParams()
-
-	assert.Equal(t, "49500", params.Get("auth-id"))
-	assert.Equal(t, "hunter2", params.Get("auth-password"))
+	if "49500" != params.Get("auth-id") {
+		t.Fatalf("want %v, got %v", "49500", params.Get("auth-id"))
+	}
+	if "hunter2" != params.Get("auth-password") {
+		t.Fatalf("want %v, got %v", "hunter2", params.Get("auth-password"))
+	}
 }
 
 // --- doRaw ---
@@ -50,11 +61,17 @@ func TestCloudNS_CloudNSClient_DoRaw_ReturnsBody_Good(t *testing.T) {
 
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/dns/test.json", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := client.doRaw(req)
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "Success")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(data), "Success") {
+		t.Fatalf("expected %v to contain %v", string(data), "Success")
+	}
 }
 
 func TestCloudNS_CloudNSClient_DoRaw_HTTPError_Bad(t *testing.T) {
@@ -74,11 +91,17 @@ func TestCloudNS_CloudNSClient_DoRaw_HTTPError_Bad(t *testing.T) {
 
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/dns/test.json", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = client.doRaw(req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cloudns API: HTTP 403")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "cloudns API: HTTP 403") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "cloudns API: HTTP 403")
+	}
 }
 
 func TestCloudNS_CloudNSClient_DoRaw_ServerError_Bad(t *testing.T) {
@@ -98,11 +121,17 @@ func TestCloudNS_CloudNSClient_DoRaw_ServerError_Bad(t *testing.T) {
 
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = client.doRaw(req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cloudns API: HTTP 500")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "cloudns API: HTTP 500") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "cloudns API: HTTP 500")
+	}
 }
 
 // --- Zone JSON parsing ---
@@ -115,10 +144,18 @@ func TestCloudNS_CloudNSZone_JSON_Good(t *testing.T) {
 
 	var zones []CloudNSZone
 	requireCloudNSJSON(t, data, &zones)
-	require.Len(t, zones, 2)
-	assert.Equal(t, "example.com", zones[0].Name)
-	assert.Equal(t, "master", zones[0].Type)
-	assert.Equal(t, "test.io", zones[1].Name)
+	if len(zones) != 2 {
+		t.Fatalf("want length %v, got %v", 2, len(zones))
+	}
+	if "example.com" != zones[0].Name {
+		t.Fatalf("want %v, got %v", "example.com", zones[0].Name)
+	}
+	if "master" != zones[0].Type {
+		t.Fatalf("want %v, got %v", "master", zones[0].Type)
+	}
+	if "test.io" != zones[1].Name {
+		t.Fatalf("want %v, got %v", "test.io", zones[1].Name)
+	}
 }
 
 func TestCloudNS_CloudNSZone_JSON_EmptyResponse_Good(t *testing.T) {
@@ -129,7 +166,9 @@ func TestCloudNS_CloudNSZone_JSON_EmptyResponse_Good(t *testing.T) {
 	r := core.JSONUnmarshal([]byte(data), &zones)
 
 	// Should fail to parse as slice — this is the edge case ListZones handles
-	assert.False(t, r.OK)
+	if r.OK {
+		t.Fatal("expected false")
+	}
 }
 
 // --- Record JSON parsing ---
@@ -157,20 +196,40 @@ func TestCloudNS_CloudNSRecord_JSON_Good(t *testing.T) {
 
 	var records map[string]CloudNSRecord
 	requireCloudNSJSON(t, data, &records)
-	require.Len(t, records, 2)
+	if len(records) != 2 {
+		t.Fatalf("want length %v, got %v", 2, len(records))
+	}
 
 	aRecord := records["12345"]
-	assert.Equal(t, "12345", aRecord.ID)
-	assert.Equal(t, "A", aRecord.Type)
-	assert.Equal(t, "www", aRecord.Host)
-	assert.Equal(t, "1.2.3.4", aRecord.Record)
-	assert.Equal(t, "3600", aRecord.TTL)
-	assert.Equal(t, 1, aRecord.Status)
+	if "12345" != aRecord.ID {
+		t.Fatalf("want %v, got %v", "12345", aRecord.ID)
+	}
+	if "A" != aRecord.Type {
+		t.Fatalf("want %v, got %v", "A", aRecord.Type)
+	}
+	if "www" != aRecord.Host {
+		t.Fatalf("want %v, got %v", "www", aRecord.Host)
+	}
+	if "1.2.3.4" != aRecord.Record {
+		t.Fatalf("want %v, got %v", "1.2.3.4", aRecord.Record)
+	}
+	if "3600" != aRecord.TTL {
+		t.Fatalf("want %v, got %v", "3600", aRecord.TTL)
+	}
+	if 1 != aRecord.Status {
+		t.Fatalf("want %v, got %v", 1, aRecord.Status)
+	}
 
 	mxRecord := records["12346"]
-	assert.Equal(t, "MX", mxRecord.Type)
-	assert.Equal(t, "mail.example.com", mxRecord.Record)
-	assert.Equal(t, "10", mxRecord.Priority)
+	if "MX" != mxRecord.Type {
+		t.Fatalf("want %v, got %v", "MX", mxRecord.Type)
+	}
+	if "mail.example.com" != mxRecord.Record {
+		t.Fatalf("want %v, got %v", "mail.example.com", mxRecord.Record)
+	}
+	if "10" != mxRecord.Priority {
+		t.Fatalf("want %v, got %v", "10", mxRecord.Priority)
+	}
 }
 
 func TestCloudNS_CloudNSRecord_JSON_TXTRecord_Good(t *testing.T) {
@@ -187,13 +246,23 @@ func TestCloudNS_CloudNSRecord_JSON_TXTRecord_Good(t *testing.T) {
 
 	var records map[string]CloudNSRecord
 	requireCloudNSJSON(t, data, &records)
-	require.Len(t, records, 1)
+	if len(records) != 1 {
+		t.Fatalf("want length %v, got %v", 1, len(records))
+	}
 
 	txt := records["99"]
-	assert.Equal(t, "TXT", txt.Type)
-	assert.Equal(t, "_acme-challenge", txt.Host)
-	assert.Equal(t, "abc123def456", txt.Record)
-	assert.Equal(t, "60", txt.TTL)
+	if "TXT" != txt.Type {
+		t.Fatalf("want %v, got %v", "TXT", txt.Type)
+	}
+	if "_acme-challenge" != txt.Host {
+		t.Fatalf("want %v, got %v", "_acme-challenge", txt.Host)
+	}
+	if "abc123def456" != txt.Record {
+		t.Fatalf("want %v, got %v", "abc123def456", txt.Record)
+	}
+	if "60" != txt.TTL {
+		t.Fatalf("want %v, got %v", "60", txt.TTL)
+	}
 }
 
 // --- CreateRecord response parsing ---
@@ -210,8 +279,12 @@ func TestCloudNS_CloudNSClient_CreateRecord_ResponseParsing_Good(t *testing.T) {
 	}
 
 	requireCloudNSJSON(t, data, &result)
-	assert.Equal(t, "Success", result.Status)
-	assert.Equal(t, 54321, result.Data.ID)
+	if "Success" != result.Status {
+		t.Fatalf("want %v, got %v", "Success", result.Status)
+	}
+	if 54321 != result.Data.ID {
+		t.Fatalf("want %v, got %v", 54321, result.Data.ID)
+	}
 }
 
 func TestCloudNS_CloudNSClient_CreateRecord_FailedStatus_Bad(t *testing.T) {
@@ -223,8 +296,12 @@ func TestCloudNS_CloudNSClient_CreateRecord_FailedStatus_Bad(t *testing.T) {
 	}
 
 	requireCloudNSJSON(t, data, &result)
-	assert.Equal(t, "Failed", result.Status)
-	assert.Equal(t, "Record already exists.", result.StatusDescription)
+	if "Failed" != result.Status {
+		t.Fatalf("want %v, got %v", "Failed", result.Status)
+	}
+	if "Record already exists." != result.StatusDescription {
+		t.Fatalf("want %v, got %v", "Record already exists.", result.StatusDescription)
+	}
 }
 
 // --- UpdateRecord/DeleteRecord response parsing ---
@@ -238,15 +315,21 @@ func TestCloudNS_CloudNSClient_UpdateDelete_ResponseParsing_Good(t *testing.T) {
 	}
 
 	requireCloudNSJSON(t, data, &result)
-	assert.Equal(t, "Success", result.Status)
+	if "Success" != result.Status {
+		t.Fatalf("want %v, got %v", "Success", result.Status)
+	}
 }
 
 // --- Full round-trip tests via doRaw ---
 
 func TestCloudNS_CloudNSClient_ListZones_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.NotEmpty(t, r.URL.Query().Get("auth-id"))
-		assert.NotEmpty(t, r.URL.Query().Get("auth-password"))
+		if len(r.URL.Query().Get("auth-id")) == 0 {
+			t.Fatal("expected non-empty")
+		}
+		if len(r.URL.Query().Get("auth-password")) == 0 {
+			t.Fatal("expected non-empty")
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[{"name":"example.com","type":"master","zone":"domain","status":"1"}]`))
@@ -262,14 +345,22 @@ func TestCloudNS_CloudNSClient_ListZones_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	zones, err := client.ListZones(context.Background())
-	require.NoError(t, err)
-	require.Len(t, zones, 1)
-	assert.Equal(t, "example.com", zones[0].Name)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(zones) != 1 {
+		t.Fatalf("want length %v, got %v", 1, len(zones))
+	}
+	if "example.com" != zones[0].Name {
+		t.Fatalf("want %v, got %v", "example.com", zones[0].Name)
+	}
 }
 
 func TestCloudNS_CloudNSClient_ListRecords_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
+		if "example.com" != r.URL.Query().Get("domain-name") {
+			t.Fatalf("want %v, got %v", "example.com", r.URL.Query().Get("domain-name"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -288,20 +379,40 @@ func TestCloudNS_CloudNSClient_ListRecords_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	records, err := client.ListRecords(context.Background(), "example.com")
-	require.NoError(t, err)
-	require.Len(t, records, 2)
-	assert.Equal(t, "A", records["1"].Type)
-	assert.Equal(t, "CNAME", records["2"].Type)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("want length %v, got %v", 2, len(records))
+	}
+	if "A" != records["1"].Type {
+		t.Fatalf("want %v, got %v", "A", records["1"].Type)
+	}
+	if "CNAME" != records["2"].Type {
+		t.Fatalf("want %v, got %v", "CNAME", records["2"].Type)
+	}
 }
 
 func TestCloudNS_CloudNSClient_CreateRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
-		assert.Equal(t, "www", r.URL.Query().Get("host"))
-		assert.Equal(t, "A", r.URL.Query().Get("record-type"))
-		assert.Equal(t, "1.2.3.4", r.URL.Query().Get("record"))
-		assert.Equal(t, "3600", r.URL.Query().Get("ttl"))
+		if http.MethodPost != r.Method {
+			t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+		}
+		if "example.com" != r.URL.Query().Get("domain-name") {
+			t.Fatalf("want %v, got %v", "example.com", r.URL.Query().Get("domain-name"))
+		}
+		if "www" != r.URL.Query().Get("host") {
+			t.Fatalf("want %v, got %v", "www", r.URL.Query().Get("host"))
+		}
+		if "A" != r.URL.Query().Get("record-type") {
+			t.Fatalf("want %v, got %v", "A", r.URL.Query().Get("record-type"))
+		}
+		if "1.2.3.4" != r.URL.Query().Get("record") {
+			t.Fatalf("want %v, got %v", "1.2.3.4", r.URL.Query().Get("record"))
+		}
+		if "3600" != r.URL.Query().Get("ttl") {
+			t.Fatalf("want %v, got %v", "3600", r.URL.Query().Get("ttl"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was created successfully.","data":{"id":99}}`))
@@ -317,15 +428,25 @@ func TestCloudNS_CloudNSClient_CreateRecord_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	id, err := client.CreateRecord(context.Background(), "example.com", "www", "A", "1.2.3.4", 3600)
-	require.NoError(t, err)
-	assert.Equal(t, "99", id)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "99" != id {
+		t.Fatalf("want %v, got %v", "99", id)
+	}
 }
 
 func TestCloudNS_CloudNSClient_DeleteRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
-		assert.Equal(t, "42", r.URL.Query().Get("record-id"))
+		if http.MethodPost != r.Method {
+			t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+		}
+		if "example.com" != r.URL.Query().Get("domain-name") {
+			t.Fatalf("want %v, got %v", "example.com", r.URL.Query().Get("domain-name"))
+		}
+		if "42" != r.URL.Query().Get("record-id") {
+			t.Fatalf("want %v, got %v", "42", r.URL.Query().Get("record-id"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was deleted successfully."}`))
@@ -341,17 +462,27 @@ func TestCloudNS_CloudNSClient_DeleteRecord_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	err := client.DeleteRecord(context.Background(), "example.com", "42")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 // --- ACME challenge helpers ---
 
 func TestCloudNS_CloudNSClient_SetACMEChallenge_ParamVerification_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
-		assert.Equal(t, "_acme-challenge", r.URL.Query().Get("host"))
-		assert.Equal(t, "TXT", r.URL.Query().Get("record-type"))
-		assert.Equal(t, "60", r.URL.Query().Get("ttl"))
+		if "example.com" != r.URL.Query().Get("domain-name") {
+			t.Fatalf("want %v, got %v", "example.com", r.URL.Query().Get("domain-name"))
+		}
+		if "_acme-challenge" != r.URL.Query().Get("host") {
+			t.Fatalf("want %v, got %v", "_acme-challenge", r.URL.Query().Get("host"))
+		}
+		if "TXT" != r.URL.Query().Get("record-type") {
+			t.Fatalf("want %v, got %v", "TXT", r.URL.Query().Get("record-type"))
+		}
+		if "60" != r.URL.Query().Get("ttl") {
+			t.Fatalf("want %v, got %v", "60", r.URL.Query().Get("ttl"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"OK","data":{"id":777}}`))
@@ -367,8 +498,12 @@ func TestCloudNS_CloudNSClient_SetACMEChallenge_ParamVerification_Good(t *testin
 	)
 
 	id, err := client.SetACMEChallenge(context.Background(), "example.com", "acme-token-value")
-	require.NoError(t, err)
-	assert.Equal(t, "777", id)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "777" != id {
+		t.Fatalf("want %v, got %v", "777", id)
+	}
 }
 
 func TestCloudNS_CloudNSClient_ClearACMEChallenge_Logic_Good(t *testing.T) {
@@ -385,10 +520,15 @@ func TestCloudNS_CloudNSClient_ClearACMEChallenge_Logic_Good(t *testing.T) {
 			toDelete = append(toDelete, id)
 		}
 	}
-
-	assert.Len(t, toDelete, 2)
-	assert.Contains(t, toDelete, "2")
-	assert.Contains(t, toDelete, "4")
+	if len(toDelete) != 2 {
+		t.Fatalf("want length %v, got %v", 2, len(toDelete))
+	}
+	if !slices.Contains(toDelete, "2") {
+		t.Fatalf("expected %v to contain %v", toDelete, "2")
+	}
+	if !slices.Contains(toDelete, "4") {
+		t.Fatalf("expected %v to contain %v", toDelete, "4")
+	}
 }
 
 // --- EnsureRecord logic ---
@@ -427,9 +567,12 @@ func TestCloudNS_EnsureRecord_Logic_AlreadyCorrect_Good(t *testing.T) {
 			needsCreate = true
 		}
 	}
-
-	assert.False(t, needsUpdate, "should not need update when value matches")
-	assert.False(t, needsCreate, "should not need create when record exists")
+	if needsUpdate {
+		t.Fatal("expected false")
+	}
+	if needsCreate {
+		t.Fatal("expected false")
+	}
 }
 
 func TestCloudNS_EnsureRecord_Logic_NeedsUpdate_Good(t *testing.T) {
@@ -450,8 +593,9 @@ func TestCloudNS_EnsureRecord_Logic_NeedsUpdate_Good(t *testing.T) {
 			break
 		}
 	}
-
-	assert.True(t, needsUpdate, "should need update when value differs")
+	if !needsUpdate {
+		t.Fatal("expected true")
+	}
 }
 
 func TestCloudNS_EnsureRecord_Logic_NeedsCreate_Good(t *testing.T) {
@@ -469,8 +613,9 @@ func TestCloudNS_EnsureRecord_Logic_NeedsCreate_Good(t *testing.T) {
 			break
 		}
 	}
-
-	assert.False(t, found, "should not find record for non-existent host")
+	if found {
+		t.Fatal("expected false")
+	}
 }
 
 // --- Edge cases ---
@@ -491,11 +636,17 @@ func TestCloudNS_CloudNSClient_DoRaw_EmptyBody_Good(t *testing.T) {
 
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := client.doRaw(req)
-	require.NoError(t, err)
-	assert.Empty(t, data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("expected empty, got %v", data)
+	}
 }
 
 func TestCloudNS_CloudNSRecord_JSON_EmptyMap_Good(t *testing.T) {
@@ -503,27 +654,45 @@ func TestCloudNS_CloudNSRecord_JSON_EmptyMap_Good(t *testing.T) {
 
 	var records map[string]CloudNSRecord
 	requireCloudNSJSON(t, data, &records)
-	assert.Empty(t, records)
+	if len(records) != 0 {
+		t.Fatalf("expected empty, got %v", records)
+	}
 }
 
 func requireCloudNSJSON(t *testing.T, data string, target any) {
 	t.Helper()
 
 	r := core.JSONUnmarshal([]byte(data), target)
-	require.True(t, r.OK)
+	if !r.OK {
+		t.Fatal("expected true")
+	}
 }
 
 // --- UpdateRecord round-trip ---
 
 func TestCloudNS_CloudNSClient_UpdateRecord_ViaDoRaw_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "example.com", r.URL.Query().Get("domain-name"))
-		assert.Equal(t, "42", r.URL.Query().Get("record-id"))
-		assert.Equal(t, "www", r.URL.Query().Get("host"))
-		assert.Equal(t, "A", r.URL.Query().Get("record-type"))
-		assert.Equal(t, "5.6.7.8", r.URL.Query().Get("record"))
-		assert.Equal(t, "3600", r.URL.Query().Get("ttl"))
+		if http.MethodPost != r.Method {
+			t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+		}
+		if "example.com" != r.URL.Query().Get("domain-name") {
+			t.Fatalf("want %v, got %v", "example.com", r.URL.Query().Get("domain-name"))
+		}
+		if "42" != r.URL.Query().Get("record-id") {
+			t.Fatalf("want %v, got %v", "42", r.URL.Query().Get("record-id"))
+		}
+		if "www" != r.URL.Query().Get("host") {
+			t.Fatalf("want %v, got %v", "www", r.URL.Query().Get("host"))
+		}
+		if "A" != r.URL.Query().Get("record-type") {
+			t.Fatalf("want %v, got %v", "A", r.URL.Query().Get("record-type"))
+		}
+		if "5.6.7.8" != r.URL.Query().Get("record") {
+			t.Fatalf("want %v, got %v", "5.6.7.8", r.URL.Query().Get("record"))
+		}
+		if "3600" != r.URL.Query().Get("ttl") {
+			t.Fatalf("want %v, got %v", "3600", r.URL.Query().Get("ttl"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was updated successfully."}`))
@@ -539,7 +708,9 @@ func TestCloudNS_CloudNSClient_UpdateRecord_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	err := client.UpdateRecord(context.Background(), "example.com", "42", "www", "A", "5.6.7.8", 3600)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestCloudNS_CloudNSClient_UpdateRecord_FailedStatus_Bad(t *testing.T) {
@@ -558,8 +729,12 @@ func TestCloudNS_CloudNSClient_UpdateRecord_FailedStatus_Bad(t *testing.T) {
 	)
 
 	err := client.UpdateRecord(context.Background(), "example.com", "999", "www", "A", "5.6.7.8", 3600)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Record not found")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Record not found") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "Record not found")
+	}
 }
 
 // --- EnsureRecord round-trip ---
@@ -580,8 +755,12 @@ func TestCloudNS_CloudNSClient_EnsureRecord_AlreadyCorrect_Good(t *testing.T) {
 	)
 
 	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "1.2.3.4", 3600)
-	require.NoError(t, err)
-	assert.False(t, changed, "should not change when record already correct")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if changed {
+		t.Fatal("expected false")
+	}
 }
 
 func TestCloudNS_CloudNSClient_EnsureRecord_NeedsUpdate_Good(t *testing.T) {
@@ -594,8 +773,12 @@ func TestCloudNS_CloudNSClient_EnsureRecord_NeedsUpdate_Good(t *testing.T) {
 			_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"www","record":"1.2.3.4","ttl":"3600","status":1}}`))
 		} else {
 			// UpdateRecord
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Equal(t, "5.6.7.8", r.URL.Query().Get("record"))
+			if http.MethodPost != r.Method {
+				t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+			}
+			if "5.6.7.8" != r.URL.Query().Get("record") {
+				t.Fatalf("want %v, got %v", "5.6.7.8", r.URL.Query().Get("record"))
+			}
 			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was updated successfully."}`))
 		}
 	}))
@@ -610,8 +793,12 @@ func TestCloudNS_CloudNSClient_EnsureRecord_NeedsUpdate_Good(t *testing.T) {
 	)
 
 	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "5.6.7.8", 3600)
-	require.NoError(t, err)
-	assert.True(t, changed, "should change when record needs update")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected true")
+	}
 }
 
 func TestCloudNS_CloudNSClient_EnsureRecord_NeedsCreate_Good(t *testing.T) {
@@ -624,8 +811,12 @@ func TestCloudNS_CloudNSClient_EnsureRecord_NeedsCreate_Good(t *testing.T) {
 			_, _ = w.Write([]byte(`{"1":{"id":"1","type":"A","host":"other","record":"1.2.3.4","ttl":"3600","status":1}}`))
 		} else {
 			// CreateRecord
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Equal(t, "www", r.URL.Query().Get("host"))
+			if http.MethodPost != r.Method {
+				t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+			}
+			if "www" != r.URL.Query().Get("host") {
+				t.Fatalf("want %v, got %v", "www", r.URL.Query().Get("host"))
+			}
 			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was created successfully.","data":{"id":99}}`))
 		}
 	}))
@@ -640,8 +831,12 @@ func TestCloudNS_CloudNSClient_EnsureRecord_NeedsCreate_Good(t *testing.T) {
 	)
 
 	changed, err := client.EnsureRecord(context.Background(), "example.com", "www", "A", "1.2.3.4", 3600)
-	require.NoError(t, err)
-	assert.True(t, changed, "should change when record needs to be created")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected true")
+	}
 }
 
 // --- ClearACMEChallenge round-trip ---
@@ -659,8 +854,12 @@ func TestCloudNS_CloudNSClient_ClearACMEChallenge_ViaDoRaw_Good(t *testing.T) {
 			}`))
 		} else {
 			// DeleteRecord
-			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Equal(t, "2", r.URL.Query().Get("record-id"))
+			if http.MethodPost != r.Method {
+				t.Fatalf("want %v, got %v", http.MethodPost, r.Method)
+			}
+			if "2" != r.URL.Query().Get("record-id") {
+				t.Fatalf("want %v, got %v", "2", r.URL.Query().Get("record-id"))
+			}
 			_, _ = w.Write([]byte(`{"status":"Success","statusDescription":"The record was deleted successfully."}`))
 		}
 	}))
@@ -675,14 +874,22 @@ func TestCloudNS_CloudNSClient_ClearACMEChallenge_ViaDoRaw_Good(t *testing.T) {
 	)
 
 	err := client.ClearACMEChallenge(context.Background(), "example.com")
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, callCount, 2, "should have called list + delete")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount < 2 {
+		t.Fatalf("want >= %v, got %v", 2, callCount)
+	}
 }
 
 func TestCloudNS_CloudNSClient_DoRaw_AuthQueryParams_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "49500", r.URL.Query().Get("auth-id"))
-		assert.Equal(t, "supersecret", r.URL.Query().Get("auth-password"))
+		if "49500" != r.URL.Query().Get("auth-id") {
+			t.Fatalf("want %v, got %v", "49500", r.URL.Query().Get("auth-id"))
+		}
+		if "supersecret" != r.URL.Query().Get("auth-password") {
+			t.Fatalf("want %v, got %v", "supersecret", r.URL.Query().Get("auth-password"))
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[]`))
@@ -700,8 +907,12 @@ func TestCloudNS_CloudNSClient_DoRaw_AuthQueryParams_Good(t *testing.T) {
 	ctx := context.Background()
 	params := client.authParams()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/dns/test.json?"+params.Encode(), nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = client.doRaw(req)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

@@ -1,5 +1,7 @@
 dappco.re/go/core v0.8.0-alpha.1 h1:gj7+Scv+L63Z7wMxbJYHhaRFkHJo2u4MMPuUSv/Dhtk=
 dappco.re/go/core v0.8.0-alpha.1/go.mod h1:f2/tBZ3+3IqDrg2F5F598llv0nmb/4gJVCFzM5geE4A=
+dappco.re/go/core/infra v0.1.8 h1:JId23Q9HpX1kJRDidORNtYW8EqB9Hs92yPSgKTSSZAg=
+dappco.re/go/core/infra v0.1.8/go.mod h1:fjBMktjawAB/4Gwwbqutq9mrygFfy5bcUNLI5ntO6D4=
 forge.lthn.ai/core/cli v0.3.5 h1:P7yK0DmSA1QnUMFuCjJZf/fk/akKPIxopQ6OwD8Sar8=
 forge.lthn.ai/core/cli v0.3.5/go.mod h1:SeArHx+hbpX5iZqgASCD7Q1EDoc6uaaGiGBotmNzIx4=
 forge.lthn.ai/core/go v0.3.1 h1:5FMTsUhLcxSr07F9q3uG0Goy4zq4eLivoqi8shSY4UM=

@@ -4,24 +4,34 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // --- Constructor ---
 
 func TestClient_NewAPIClient_Defaults_Good(t *testing.T) {
 	c := NewAPIClient()
-	assert.NotNil(t, c.client)
-	assert.Equal(t, "api", c.prefix)
-	assert.Equal(t, 3, c.retry.MaxRetries)
-	assert.Equal(t, 100*time.Millisecond, c.retry.InitialBackoff)
-	assert.Equal(t, 5*time.Second, c.retry.MaxBackoff)
-	assert.Nil(t, c.authFn)
+	if c.client == nil {
+		t.Fatal("expected non-nil")
+	}
+	if "api" != c.prefix {
+		t.Fatalf("want %v, got %v", "api", c.prefix)
+	}
+	if 3 != c.retry.MaxRetries {
+		t.Fatalf("want %v, got %v", 3, c.retry.MaxRetries)
+	}
+	if 100*time.Millisecond != c.retry.InitialBackoff {
+		t.Fatalf("want %v, got %v", 100*time.Millisecond, c.retry.InitialBackoff)
+	}
+	if 5*time.Second != c.retry.MaxBackoff {
+		t.Fatalf("want %v, got %v", 5*time.Second, c.retry.MaxBackoff)
+	}
+	if c.authFn != nil {
+		t.Fatal("expected nil, got non-nil")
+	}
 }
 
 func TestClient_NewAPIClient_WithOptions_Good(t *testing.T) {
@@ -34,23 +44,40 @@ func TestClient_NewAPIClient_WithOptions_Good(t *testing.T) {
 		WithRetry(RetryConfig{MaxRetries: 5, InitialBackoff: 200 * time.Millisecond, MaxBackoff: 10 * time.Second}),
 		WithAuth(func(req *http.Request) { authCalled = true }),
 	)
-
-	assert.Equal(t, custom, c.client)
-	assert.Equal(t, "test-api", c.prefix)
-	assert.Equal(t, 5, c.retry.MaxRetries)
-	assert.Equal(t, 200*time.Millisecond, c.retry.InitialBackoff)
-	assert.Equal(t, 10*time.Second, c.retry.MaxBackoff)
+	if custom != c.client {
+		t.Fatalf("want %v, got %v", custom, c.client)
+	}
+	if "test-api" != c.prefix {
+		t.Fatalf("want %v, got %v", "test-api", c.prefix)
+	}
+	if 5 != c.retry.MaxRetries {
+		t.Fatalf("want %v, got %v", 5, c.retry.MaxRetries)
+	}
+	if 200*time.Millisecond != c.retry.InitialBackoff {
+		t.Fatalf("want %v, got %v", 200*time.Millisecond, c.retry.InitialBackoff)
+	}
+	if 10*time.Second != c.retry.MaxBackoff {
+		t.Fatalf("want %v, got %v", 10*time.Second, c.retry.MaxBackoff)
+	}
 
 	// Trigger auth
 	c.authFn(&http.Request{Header: http.Header{}})
-	assert.True(t, authCalled)
+	if !authCalled {
+		t.Fatal("expected true")
+	}
 }
 
 func TestClient_DefaultRetryConfig_Good(t *testing.T) {
 	cfg := DefaultRetryConfig()
-	assert.Equal(t, 3, cfg.MaxRetries)
-	assert.Equal(t, 100*time.Millisecond, cfg.InitialBackoff)
-	assert.Equal(t, 5*time.Second, cfg.MaxBackoff)
+	if 3 != cfg.MaxRetries {
+		t.Fatalf("want %v, got %v", 3, cfg.MaxRetries)
+	}
+	if 100*time.Millisecond != cfg.InitialBackoff {
+		t.Fatalf("want %v, got %v", 100*time.Millisecond, cfg.InitialBackoff)
+	}
+	if 5*time.Second != cfg.MaxBackoff {
+		t.Fatalf("want %v, got %v", 5*time.Second, cfg.MaxBackoff)
+	}
 }
 
 // --- Do method ---
@@ -68,14 +95,20 @@ func TestClient_APIClient_Do_Success_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result struct {
 		Name string `json:"name"`
 	}
 	err = c.Do(req, &result)
-	require.NoError(t, err)
-	assert.Equal(t, "test", result.Name)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "test" != result.Name {
+		t.Fatalf("want %v, got %v", "test", result.Name)
+	}
 }
 
 func TestClient_APIClient_Do_NilResult_Good(t *testing.T) {
@@ -90,15 +123,21 @@ func TestClient_APIClient_Do_NilResult_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, ts.URL+"/item", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestClient_APIClient_Do_AuthApplied_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer my-token", r.Header.Get("Authorization"))
+		if "Bearer my-token" != r.Header.Get("Authorization") {
+			t.Fatalf("want %v, got %v", "Bearer my-token", r.Header.Get("Authorization"))
+		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{}`))
 	}))
@@ -113,10 +152,14 @@ func TestClient_APIClient_Do_AuthApplied_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestClient_APIClient_Do_ClientError_Bad(t *testing.T) {
@@ -133,12 +176,20 @@ func TestClient_APIClient_Do_ClientError_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/missing", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "test-api: HTTP 404")
-	assert.Contains(t, err.Error(), "not found")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "test-api: HTTP 404") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "test-api: HTTP 404")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "not found")
+	}
 }
 
 func TestClient_APIClient_Do_DecodeError_Bad(t *testing.T) {
@@ -154,12 +205,18 @@ func TestClient_APIClient_Do_DecodeError_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result struct{ Name string }
 	err = c.Do(req, &result)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "decode response")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "decode response") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "decode response")
+	}
 }
 
 // --- Retry logic ---
@@ -190,15 +247,23 @@ func TestClient_APIClient_Do_RetriesServerError_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result struct {
 		OK bool `json:"ok"`
 	}
 	err = c.Do(req, &result)
-	require.NoError(t, err)
-	assert.True(t, result.OK)
-	assert.Equal(t, int32(3), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.OK {
+		t.Fatal("expected true")
+	}
+	if int32(3) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(3), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_Do_ExhaustsRetries_Bad(t *testing.T) {
@@ -222,13 +287,21 @@ func TestClient_APIClient_Do_ExhaustsRetries_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "exhaust-test: HTTP 500")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "exhaust-test: HTTP 500") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "exhaust-test: HTTP 500")
+	}
 	// 1 initial + 2 retries = 3 attempts
-	assert.Equal(t, int32(3), attempts.Load())
+	if int32(3) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(3), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_Do_NoRetryOn4xx_Good(t *testing.T) {
@@ -251,12 +324,18 @@ func TestClient_APIClient_Do_NoRetryOn4xx_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
 	// 4xx errors are NOT retried
-	assert.Equal(t, int32(1), attempts.Load())
+	if int32(1) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(1), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_Do_ZeroRetries_Good(t *testing.T) {
@@ -275,11 +354,17 @@ func TestClient_APIClient_Do_ZeroRetries_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
-	assert.Equal(t, int32(1), attempts.Load())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if int32(1) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(1), attempts.Load())
+	}
 }
 
 // --- Rate limiting ---
@@ -310,7 +395,9 @@ func TestClient_APIClient_Do_RateLimitRetry_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	start := time.Now()
 	var result struct {
@@ -318,12 +405,19 @@ func TestClient_APIClient_Do_RateLimitRetry_Good(t *testing.T) {
 	}
 	err = c.Do(req, &result)
 	elapsed := time.Since(start)
-
-	require.NoError(t, err)
-	assert.True(t, result.OK)
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.OK {
+		t.Fatal("expected true")
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 	// Should have waited at least 1 second for Retry-After
-	assert.GreaterOrEqual(t, elapsed.Milliseconds(), int64(900))
+	if elapsed.Milliseconds() < int64(900) {
+		t.Fatalf("want >= %v, got %v", int64(900), elapsed.Milliseconds())
+	}
 }
 
 func TestClient_APIClient_Do_RateLimitExhausted_Bad(t *testing.T) {
@@ -347,12 +441,21 @@ func TestClient_APIClient_Do_RateLimitExhausted_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "rate limited")
-	assert.Equal(t, int32(2), attempts.Load()) // 1 initial + 1 retry
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "rate limited") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "rate limited")
+	}
+	// 1 initial + 1 retry
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_Do_RateLimitNoRetryAfterHeader_Good(t *testing.T) {
@@ -380,11 +483,17 @@ func TestClient_APIClient_Do_RateLimitNoRetryAfterHeader_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	require.NoError(t, err)
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_Do_ContextCancelled_Ugly(t *testing.T) {
@@ -407,10 +516,14 @@ func TestClient_APIClient_Do_ContextCancelled_Ugly(t *testing.T) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	err = c.Do(req, nil)
-	assert.Error(t, err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
 }
 
 // --- DoRaw method ---
@@ -427,19 +540,31 @@ func TestClient_APIClient_DoRaw_Success_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/data", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := c.DoRaw(req)
-	require.NoError(t, err)
-	assert.Equal(t, "raw data here", string(data))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "raw data here" != string(data) {
+		t.Fatalf("want %v, got %v", "raw data here", string(data))
+	}
 }
 
 func TestClient_APIClient_DoRaw_AuthApplied_Good(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		assert.True(t, ok)
-		assert.Equal(t, "user", user)
-		assert.Equal(t, "pass", pass)
+		if !ok {
+			t.Fatal("expected true")
+		}
+		if "user" != user {
+			t.Fatalf("want %v, got %v", "user", user)
+		}
+		if "pass" != pass {
+			t.Fatalf("want %v, got %v", "pass", pass)
+		}
 		_, _ = w.Write([]byte(`ok`))
 	}))
 	defer ts.Close()
@@ -451,11 +576,17 @@ func TestClient_APIClient_DoRaw_AuthApplied_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := c.DoRaw(req)
-	require.NoError(t, err)
-	assert.Equal(t, "ok", string(data))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "ok" != string(data) {
+		t.Fatalf("want %v, got %v", "ok", string(data))
+	}
 }
 
 func TestClient_APIClient_DoRaw_ClientError_Bad(t *testing.T) {
@@ -472,11 +603,17 @@ func TestClient_APIClient_DoRaw_ClientError_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/secret", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = c.DoRaw(req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "raw-test: HTTP 403")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "raw-test: HTTP 403") {
+		t.Fatalf("expected %v to contain %v", err.Error(), "raw-test: HTTP 403")
+	}
 }
 
 func TestClient_APIClient_DoRaw_RetriesServerError_Good(t *testing.T) {
@@ -503,12 +640,20 @@ func TestClient_APIClient_DoRaw_RetriesServerError_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := c.DoRaw(req)
-	require.NoError(t, err)
-	assert.Equal(t, "ok", string(data))
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "ok" != string(data) {
+		t.Fatalf("want %v, got %v", "ok", string(data))
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_DoRaw_RateLimitRetry_Good(t *testing.T) {
@@ -536,12 +681,20 @@ func TestClient_APIClient_DoRaw_RateLimitRetry_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := c.DoRaw(req)
-	require.NoError(t, err)
-	assert.Equal(t, "ok", string(data))
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "ok" != string(data) {
+		t.Fatalf("want %v, got %v", "ok", string(data))
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 func TestClient_APIClient_DoRaw_NoRetryOn4xx_Bad(t *testing.T) {
@@ -564,34 +717,48 @@ func TestClient_APIClient_DoRaw_NoRetryOn4xx_Bad(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/test", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = c.DoRaw(req)
-	assert.Error(t, err)
-	assert.Equal(t, int32(1), attempts.Load())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if int32(1) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(1), attempts.Load())
+	}
 }
 
 // --- parseRetryAfter ---
 
 func TestClient_ParseRetryAfter_Seconds_Good(t *testing.T) {
 	d := parseRetryAfter("5")
-	assert.Equal(t, 5*time.Second, d)
+	if 5*time.Second != d {
+		t.Fatalf("want %v, got %v", 5*time.Second, d)
+	}
 }
 
 func TestClient_ParseRetryAfter_EmptyDefault_Good(t *testing.T) {
 	d := parseRetryAfter("")
-	assert.Equal(t, 1*time.Second, d)
+	if 1*time.Second != d {
+		t.Fatalf("want %v, got %v", 1*time.Second, d)
+	}
 }
 
 func TestClient_ParseRetryAfter_InvalidFallback_Bad(t *testing.T) {
 	d := parseRetryAfter("not-a-number")
-	assert.Equal(t, 1*time.Second, d)
+	if 1*time.Second != d {
+		t.Fatalf("want %v, got %v", 1*time.Second, d)
+	}
 }
 
 func TestClient_ParseRetryAfter_Zero_Good(t *testing.T) {
 	d := parseRetryAfter("0")
 	// 0 is not > 0, falls back to 1s
-	assert.Equal(t, 1*time.Second, d)
+	if 1*time.Second != d {
+		t.Fatalf("want %v, got %v", 1*time.Second, d)
+	}
 }
 
 // --- Integration: HCloudClient uses APIClient retry ---
@@ -627,9 +794,15 @@ func TestClient_HCloudClient_RetriesOnServerError_Good(t *testing.T) {
 	)
 
 	servers, err := client.ListServers(context.Background())
-	require.NoError(t, err)
-	assert.Empty(t, servers)
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(servers) != 0 {
+		t.Fatalf("expected empty, got %v", servers)
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 func TestClient_HCloudClient_HandlesRateLimit_Good(t *testing.T) {
@@ -664,9 +837,15 @@ func TestClient_HCloudClient_HandlesRateLimit_Good(t *testing.T) {
 	)
 
 	servers, err := client.ListServers(context.Background())
-	require.NoError(t, err)
-	assert.Empty(t, servers)
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(servers) != 0 {
+		t.Fatalf("expected empty, got %v", servers)
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 // --- Integration: CloudNS uses APIClient retry ---
@@ -699,10 +878,18 @@ func TestClient_CloudNSClient_RetriesOnServerError_Good(t *testing.T) {
 	)
 
 	zones, err := client.ListZones(context.Background())
-	require.NoError(t, err)
-	require.Len(t, zones, 1)
-	assert.Equal(t, "example.com", zones[0].Name)
-	assert.Equal(t, int32(2), attempts.Load())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(zones) != 1 {
+		t.Fatalf("want length %v, got %v", 1, len(zones))
+	}
+	if "example.com" != zones[0].Name {
+		t.Fatalf("want %v, got %v", "example.com", zones[0].Name)
+	}
+	if int32(2) != attempts.Load() {
+		t.Fatalf("want %v, got %v", int32(2), attempts.Load())
+	}
 }
 
 // --- Rate limit shared state ---
@@ -732,9 +919,15 @@ func TestClient_APIClient_RateLimitSharedState_Good(t *testing.T) {
 	)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/first", nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	data, err := c.DoRaw(req)
-	require.NoError(t, err)
-	assert.Equal(t, "ok", string(data))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if "ok" != string(data) {
+		t.Fatalf("want %v, got %v", "ok", string(data))
+	}
 }
