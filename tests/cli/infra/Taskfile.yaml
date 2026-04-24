@@ -1,0 +1,24 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  test:
+    desc: Validate the go-infra AX-10 CLI artifact driver.
+    dir: ../../..
+    cmds:
+      - |
+        export GOWORK=off
+        export GOCACHE="${GOCACHE:-/tmp/go-infra-gocache}"
+        export GOMODCACHE="${GOMODCACHE:-/tmp/go-infra-gomodcache}"
+        mkdir -p "$GOCACHE" "$GOMODCACHE"
+
+        bin="$(mktemp -t go-infra-cli.XXXXXX)"
+        trap 'rm -f "$bin"' EXIT
+
+        go build -o "$bin" ./tests/cli/infra
+        "$bin"
+
+        echo "go-infra AX-10 CLI artifact smoke passed"
